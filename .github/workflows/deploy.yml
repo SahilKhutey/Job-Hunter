@@ -35,22 +35,29 @@ jobs:
       # Build and Push Worker
       - name: Build and Push Celery Worker
         uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile.worker
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/hunteros-worker:latest
+      # 📤 Push Images
+      - name: Push images
+        run: |
+          docker tag hunteros-api ${{ secrets.DOCKER_USERNAME }}/hunteros-api:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/hunteros-api:latest
 
-      # Build and Push Frontend
-      - name: Build and Push Frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/hunteros-frontend:latest
+          docker tag hunteros-worker ${{ secrets.DOCKER_USERNAME }}/hunteros-worker:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/hunteros-worker:latest
 
-      # Deploy via SSH
+          docker tag hunteros-frontend ${{ secrets.DOCKER_USERNAME }}/hunteros-frontend:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/hunteros-frontend:latest
+
+      # 🛡️ Run System Audit
+      - name: Run System Audit
+        run: |
+          cd audit
+          pip install -r requirements.txt
+          # Start containers in CI to test? 
+          # For now, we'll run static security checks
+          bandit -r ../backend/
+          safety check
+
+      # 🚀 Deploy to Server (SSH)
       - name: Deploy to Production Server
         uses: appleboy/ssh-action@v1.0.3
         with:

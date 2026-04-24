@@ -14,6 +14,17 @@ from app.ai.llm_client import llm_client
 from app.api.routes import user, automation, profile, application, agent, execution, websocket, jobs, dashboard, onboarding, resume, analytics
 
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
+import sentry_sdk
+import os
+
+# ── Observability Setup ───────────────────────────────────────────────────────
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
 
 
 from app.auth import routes as auth_routes
@@ -26,10 +37,14 @@ from starlette.middleware.sessions import SessionMiddleware
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    title="HunterOS API",
+    description="Autonomous Career Execution Engine",
+    version="1.0.0"
 )
+
+# ── Metrics Instrumentation ───────────────────────────────────────────────────
+Instrumentator().instrument(app).expose(app)
+
 
 # CORS setup
 app.add_middleware(
