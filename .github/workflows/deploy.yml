@@ -57,14 +57,20 @@ jobs:
 
       # 🔍 Secret Leak Detection
       - name: Gitleaks Scan
-        run: |
-          # Use a pre-built action or local binary
-          # gitleaks detect --source . --verbose --redact
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 🐳 Container Security Scan
       - name: Trivy Scan (Backend)
-        run: |
-          # trivy image ${{ secrets.DOCKER_USERNAME }}/hunteros-api:latest
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/hunteros-api:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
 
       # 🚀 Deploy to Server (SSH)

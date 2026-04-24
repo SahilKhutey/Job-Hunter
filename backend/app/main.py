@@ -19,12 +19,13 @@ import sentry_sdk
 import os
 
 # ── Observability Setup ───────────────────────────────────────────────────────
-if os.getenv("SENTRY_DSN"):
+if settings.SENTRY_DSN:
     sentry_sdk.init(
-        dsn=os.getenv("SENTRY_DSN"),
+        dsn=settings.SENTRY_DSN,
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
     )
+
 
 
 from app.auth import routes as auth_routes
@@ -49,19 +50,16 @@ Instrumentator().instrument(app).expose(app)
 # CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000"
-    ],
+    allow_origins=["*"], # In production, restrict this to your domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # Add Session Middleware for OAuth
-app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+
 
 
 @app.middleware("http")

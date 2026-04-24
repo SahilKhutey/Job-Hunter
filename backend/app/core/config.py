@@ -10,9 +10,13 @@ class Settings(BaseSettings):
     REDIS_URL: str
     OPENAI_API_KEY: str
     
-    JWT_SECRET: str
+    SECRET_KEY: str # Unifying with dependencies.py
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15 # 15 minutes for Zero-Trust
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    SENTRY_DSN: Optional[str] = None
+
 
     # OAuth Settings (Optional)
     GOOGLE_CLIENT_ID: Optional[str] = None
