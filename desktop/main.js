@@ -1,5 +1,7 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
+const { runAutomation } = require('./automation/engine');
+
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -32,6 +34,12 @@ function createWindow() {
 
 app.whenReady().then(() => {
     createWindow();
+
+    # IPC Handlers
+    ipcMain.handle('run-automation', async (event, { jobUrl, profileData, resumePath }) => {
+        return await runAutomation(jobUrl, profileData, resumePath);
+    });
+
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
