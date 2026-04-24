@@ -2,12 +2,9 @@
 
 > **The Autonomous Career Execution Engine.**  
 
-> Don't just apply. Optimize, simulate, and win.
+[![License: Commercial](https://img.shields.io/badge/License-Commercial-blue.svg)](#license)
+[![Architecture](https://img.shields.io/badge/Docs-Architecture-orange.svg)](ARCHITECTURE.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2015-black.svg?style=flat&logo=next.js)](https://nextjs.org/)
-[![OpenAI](https://img.shields.io/badge/Intelligence-GPT--4o-412991.svg?style=flat&logo=openai)](https://openai.com/)
 
 ---
 
@@ -97,7 +94,8 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is protected by a **Commercial License Agreement**. Unauthorized copying, distribution, or use is strictly prohibited. See the [LICENSE](LICENSE) file for the full legal agreement.
+
 
 ---
 
