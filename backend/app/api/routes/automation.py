@@ -10,8 +10,9 @@ router = APIRouter()
 class ApplicationRequest(BaseModel):
     job_id: str
     job_url: str
-    platform: str
+    resume_path: str
     profile_id: int
+
 
 @router.post("/apply")
 async def start_apply(req: ApplicationRequest, db: Session = Depends(get_db)):
@@ -32,9 +33,10 @@ async def start_apply(req: ApplicationRequest, db: Session = Depends(get_db)):
     await application_engine.start_application(
         req.job_id,
         req.job_url,
-        req.platform,
-        user_identity
+        user_identity,
+        req.resume_path
     )
+
     
     return {"status": "started", "job_id": req.job_id}
 

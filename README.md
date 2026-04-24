@@ -20,7 +20,9 @@
 - **📄 Tailoring Engine**: AI-powered per-job resume optimization. Every application gets a unique, high-impact PDF.
 - **📊 ATS Simulation**: A sophisticated scoring loop using semantic embeddings and structural rules to predict how recruiters see your resume.
 - **⚡ Auto-Fix Loop**: Don't just find gaps—automatically bridge them. The system suggests and implements improvements to increase your match score.
+- **📱 Multi-Platform Ecosystem**: Integrated Mobile (Expo) for monitoring and Desktop (Electron) for high-performance automation execution.
 - **🕵️ Multi-Agent Orchestration**: A backend architecture designed for parallel job scraping, analysis, and execution.
+
 
 ---
 
@@ -39,21 +41,12 @@
 ```text
 Job-Hunter/
 ├── backend/                # FastAPI Application
-│   ├── app/
-│   │   ├── api/            # API Routes (REST + WS)
-│   │   ├── auth/           # Identity & OAuth Logic
-│   │   ├── services/       # Core Business Logic (Tailoring, Scoring, Fixer)
-│   │   ├── models/         # SQLAlchemy Database Models
-│   │   └── ai/             # LLM & Embedding Clients
-│   └── static/             # Generated Assets (Tailored Resumes)
-├── frontend/               # Next.js Application
-│   ├── src/
-│   │   ├── app/            # App Router (Pages & Layouts)
-│   │   ├── components/     # UI Component Library
-│   │   ├── store/          # Zustand State Management
-│   │   └── lib/            # API & Auth Helpers
+├── frontend/               # Next.js Web Dashboard
+├── desktop/                # Electron App (Execution Engine)
+├── mobile/                 # Expo App (Mission Control)
 ├── docker-compose.yml      # Container Orchestration
 └── ROADMAP.md              # Future Vision & Goals
+
 ```
 
 ---

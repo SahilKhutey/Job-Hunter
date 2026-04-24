@@ -1,54 +1,53 @@
-import asyncio
 import logging
-from typing import Dict, List, Optional
-from app.services.automation_service import automation_service
-from app.api.routes.websocket import emit_agent_update
+import asyncio
+from typing import Dict, Any
+from app.agents.application_agent import ApplicationAgent
+from app.core.database import SessionLocal
+
 
 logger = logging.getLogger(__name__)
 
 class ApplicationEngine:
+    """
+    Service layer to manage multiple application tasks.
+    """
     def __init__(self):
-        self.active_tasks: Dict[str, asyncio.Task] = {}
-        self.history: List[Dict] = []
+        self.active_tasks: Dict[str, str] = {} # job_id -> status
 
-    async def start_application(self, job_id: str, job_url: str, platform: str, user_profile: Dict):
-        """Starts an automated application task."""
-        if job_id in self.active_tasks and not self.active_tasks[job_id].done():
-            await emit_agent_update("System", "error", f"Application for job {job_id} is already running.")
-            return
+    async def start_application(self, job_id: str, job_url: str, profile_data: Dict[str, Any], resume_path: str):
+        """
+        Launches an autonomous application agent for a specific job.
+        """
+        self.active_tasks[job_id] = "Starting..."
+        
+        # Fire and forget or run in a background task
+        asyncio.create_task(self._run_agent(job_id, job_url, profile_data, resume_path))
+        
+        return {"job_id": job_id, "status": "Initiated"}
 
-        task = asyncio.create_task(
-            self._run_application(job_id, job_url, platform, user_profile)
-        )
-        self.active_tasks[job_id] = task
-        return task
-
-    async def _run_application(self, job_id: str, job_url: str, platform: str, user_profile: Dict):
+    async def _run_agent(self, job_id: str, job_url: str, profile_data: Dict[str, Any], resume_path: str):
+        db = SessionLocal()
         try:
-            await automation_service.apply_to_job(job_id, job_url, platform, user_profile)
-            self.history.append({
-                "job_id": job_id,
-                "status": "completed",
-                "platform": platform
-            })
-        except Exception as e:
-            logger.error(f"Application failed for job {job_id}: {e}")
-            await emit_agent_update("Hunter AI", "error", f"Critical failure: {str(e)}")
-            self.history.append({
-                "job_id": job_id,
-                "status": "failed",
-                "error": str(e)
-            })
-        finally:
-            if job_id in self.active_tasks:
-                del self.active_tasks[job_id]
+            self.active_tasks[job_id] = "Initializing Browser..."
+            user_id = str(profile_data.get("id", "default"))
+            agent = ApplicationAgent(user_id, profile_data, db)
+            
+            self.active_tasks[job_id] = "Navigating to Job..."
+            success = await agent.apply(int(job_id), job_url, resume_path)
 
-    def get_status(self, job_id: str) -> str:
-        if job_id in self.active_tasks:
-            return "running"
-        for entry in self.history:
-            if entry["job_id"] == job_id:
-                return entry["status"]
-        return "idle"
+            
+            if success:
+                self.active_tasks[job_id] = "Completed"
+            else:
+                self.active_tasks[job_id] = "Failed"
+        except Exception as e:
+            logger.error(f"Engine error for job {job_id}: {e}")
+            self.active_tasks[job_id] = f"Error: {str(e)}"
+        finally:
+            db.close()
+
+
+    def get_status(self, job_id: str):
+        return self.active_tasks.get(job_id, "Not Found")
 
 application_engine = ApplicationEngine()

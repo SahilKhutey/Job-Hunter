@@ -11,7 +11,8 @@ from app.models.profile import Profile
 from app.services.matching_service import matching_service
 
 from app.ai.llm_client import llm_client
-from app.api.routes import user, automation, profile, application, agent, execution, websocket, jobs, dashboard, onboarding, resume
+from app.api.routes import user, automation, profile, application, agent, execution, websocket, jobs, dashboard, onboarding, resume, analytics
+
 from fastapi.staticfiles import StaticFiles
 
 
@@ -74,6 +75,8 @@ app.include_router(agent.router, prefix="/api/v1/agent", tags=["Multi-Agent Pipe
 app.include_router(execution.router, prefix="/api/v1/execution", tags=["Application Execution Engine"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Job Feed"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard Intelligence"])
+app.include_router(analytics.router, prefix="/api/v1", tags=["Dashboard Intelligence"])
+
 
 # Mount static files for resume downloads
 os.makedirs("static/resumes", exist_ok=True)

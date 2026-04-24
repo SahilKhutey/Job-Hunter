@@ -31,11 +31,21 @@ class Application(Base):
     __tablename__ = "applications"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
     job_id = Column(Integer, ForeignKey("jobs.id"))
-    status = Column(String, default="pending") # pending, applied, interview, rejected, offer
+    
+    status = Column(String, default="applied") # applied, shortlisted, interview, rejected, offer
     applied_at = Column(DateTime(timezone=True), server_default=func.now())
     
+    resume_version = Column(String) # e.g. "Full-Stack_v1", "Tailored_JS_JD123"
     resume_path = Column(String)
     cover_letter = Column(Text)
     
+    platform = Column(String) # linkedin, indeed, company_site
+    
+    # Store extra signals (e.g. why we applied, score at time of application)
+    application_metadata = Column(JSON, default=dict)
+    
     job = relationship("Job", back_populates="applications")
+    user = relationship("User", back_populates="applications")
+

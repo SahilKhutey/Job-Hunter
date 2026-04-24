@@ -1,0 +1,16 @@
+{
+  "name": "job-hunter-os-desktop",
+  "version": "1.0.0",
+  "description": "Autonomous Career Execution Engine - Desktop Mode",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
+    "build": "electron-builder"
+  },
+  "author": "Sahil Khutey",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^41.3.0"
+  }
+}

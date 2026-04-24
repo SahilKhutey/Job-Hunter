@@ -16,6 +16,9 @@ class User(Base):
     
     # Relationships
     identity = relationship("UserIdentity", back_populates="user", uselist=False)
+    applications = relationship("Application", back_populates="user")
+    credentials = relationship("Credential", back_populates="user")
+
 
 class UserIdentity(Base):
     __tablename__ = "user_identities"
@@ -42,9 +45,14 @@ class Credential(Base):
     __tablename__ = "credentials"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
     platform = Column(String) # e.g., "LinkedIn", "Indeed"
+
     username = Column(String)
     encrypted_password = Column(String)
     
     # Session data (stored as JSON)
     storage_state = Column(JSON, nullable=True)
+    
+    user = relationship("User", back_populates="credentials")
+
