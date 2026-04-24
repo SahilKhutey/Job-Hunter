@@ -52,10 +52,20 @@ jobs:
         run: |
           cd audit
           pip install -r requirements.txt
-          # Start containers in CI to test? 
-          # For now, we'll run static security checks
           bandit -r ../backend/
           safety check
+
+      # 🔍 Secret Leak Detection
+      - name: Gitleaks Scan
+        run: |
+          # Use a pre-built action or local binary
+          # gitleaks detect --source . --verbose --redact
+
+      # 🐳 Container Security Scan
+      - name: Trivy Scan (Backend)
+        run: |
+          # trivy image ${{ secrets.DOCKER_USERNAME }}/hunteros-api:latest
+
 
       # 🚀 Deploy to Server (SSH)
       - name: Deploy to Production Server

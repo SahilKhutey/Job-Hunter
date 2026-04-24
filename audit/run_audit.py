@@ -8,6 +8,8 @@ from api_tests import run_api_tests
 from auth_tests import run_auth_tests
 from security_scan import run_security_scan
 from service_checks import run_service_checks
+from advanced_security import run_advanced_security
+
 
 def main():
     print("="*60)
@@ -20,6 +22,8 @@ def main():
         run_api_tests()
         run_auth_tests()
         run_security_scan()
+        run_advanced_security()
+
         
         print("\n" + "="*60)
         print("✅ AUDIT COMPLETE - SYSTEM STABLE")
