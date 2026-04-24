@@ -1,6 +1,7 @@
-# 🚀 AI Job Hunter OS
+# 🚀 HunterOS
 
-> **The first Autonomous Career Execution Engine.**  
+> **The Autonomous Career Execution Engine.**  
+
 > Don't just apply. Optimize, simulate, and win.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,17 +11,20 @@
 
 ---
 
-## 🧠 What is Job Hunter OS?
+## 🧠 What is HunterOS?
 
-**Job Hunter OS** is a production-grade, multi-agent platform designed to automate the most grueling parts of the job search. Unlike traditional job boards, this system acts as your **Personal Talent Agent**, handling everything from identity management and resume tailoring to real-time ATS simulation.
+
+**HunterOS** is a production-grade, multi-agent platform designed to automate the most grueling parts of the job search. Unlike traditional job boards, this system acts as your **Personal Talent Agent**, handling everything from identity management and resume tailoring to real-time ATS simulation.
+
 
 ### ✨ Key Features
 
 - **🔐 Trust Layer**: Production-ready JWT authentication with Google & LinkedIn OAuth integration.
 - **📄 Tailoring Engine**: AI-powered per-job resume optimization. Every application gets a unique, high-impact PDF.
 - **📊 ATS Simulation**: A sophisticated scoring loop using semantic embeddings and structural rules to predict how recruiters see your resume.
-- **⚡ Auto-Fix Loop**: Don't just find gaps—automatically bridge them. The system suggests and implements improvements to increase your match score.
+- **⚡ Auto-Fix Loop**: Don't just find gaps—automatically bridge them. HunterOS suggests and implements improvements to increase your match score.
 - **📱 Multi-Platform Ecosystem**: Integrated Mobile (Expo) for monitoring and Desktop (Electron) for high-performance automation execution.
+
 - **🕵️ Multi-Agent Orchestration**: A backend architecture designed for parallel job scraping, analysis, and execution.
 
 
