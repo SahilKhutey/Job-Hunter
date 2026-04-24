@@ -6,9 +6,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    ports:
-      - "8000:8000"
+    # Ports moved to gateway
     env_file:
+
       - .env
     depends_on:
       - redis
@@ -32,16 +32,31 @@ services:
   frontend:
     build: ./frontend
     restart: always
-    ports:
-      - "3000:3000"
+    # Ports moved to gateway
     env_file:
+
       - .env
     depends_on:
       - api
     networks:
       - hunter-net
 
+  gateway:
+    image: nginx:stable-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - hunter-net
+
   redis:
+
     image: redis:7-alpine
     networks:
       - hunter-net
