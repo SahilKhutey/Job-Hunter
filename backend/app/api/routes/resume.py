@@ -30,18 +30,30 @@ async def tailor_resume_endpoint(
         if not job_description:
             raise HTTPException(status_code=400, detail="Job description is required")
 
-        # Get user's base profile from identity_data
+        # Get user's base profile - Try UserIdentity first, then fallback to Profile model
         identity = db.query(UserIdentity).filter(UserIdentity.user_id == current_user.id).first()
-        if not identity or not identity.identity_data:
-            raise HTTPException(status_code=404, detail="User profile not found. Please complete onboarding first.")
+        profile = db.query(Profile).filter(Profile.email == current_user.email).first()
 
-        base_profile = identity.identity_data
-        
-        # Add basic info from identity if not in identity_data
-        base_profile["full_name"] = identity.full_name
+        if identity and identity.identity_data:
+            base_profile = identity.identity_data
+            base_profile["full_name"] = identity.full_name or current_user.full_name
+            base_profile["phone"] = identity.phone
+            base_profile["location"] = identity.location
+        elif profile:
+            base_profile = {
+                "summary": profile.summary,
+                "skills": profile.skills or [],
+                "experience": (profile.structured_data or {}).get("experience", []),
+                "education": (profile.structured_data or {}).get("education", []),
+                "job_title": (profile.structured_data or {}).get("job_title", ""),
+                "full_name": profile.full_name or current_user.full_name,
+                "phone": profile.phone,
+                "location": profile.location
+            }
+        else:
+            raise HTTPException(status_code=404, detail="User profile not found. Please complete onboarding or create a profile.")
+
         base_profile["email"] = current_user.email
-        base_profile["phone"] = identity.phone
-        base_profile["location"] = identity.location
 
         # AI Tailoring
         tailored_data = tailor_resume(base_profile, job_description)

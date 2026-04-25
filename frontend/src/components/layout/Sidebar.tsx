@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUserStore } from "@/store/useUserStore";
+import { useRealtime } from "@/store/useRealtime";
 
 const links = [
   { name: "Dashboard", href: "/", icon: "dashboard" },
@@ -17,6 +18,9 @@ const links = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { profile, clearProfile } = useUserStore();
+  const { wsStatus } = useRealtime();
+
+  const isOnline = wsStatus === "connected";
 
   return (
     <aside className="w-60 shrink-0 bg-neutral-950 border-r border-neutral-800/60 flex flex-col h-full py-4 px-3">
@@ -29,8 +33,10 @@ export default function Sidebar() {
           <span className="font-bold text-sm tracking-tight text-white">AI Job Hunter</span>
         </div>
         <div className="mt-2 flex items-center gap-1.5 px-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-slow" />
-          <span className="text-[10px] font-medium text-emerald-400">Hunter AI v2.4 · Active</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse-slow" : "bg-red-500"}`} />
+          <span className={`text-[10px] font-medium ${isOnline ? "text-emerald-400" : "text-red-500"}`}>
+            {isOnline ? "Hunter AI v2.4 · Active" : "Backend Offline"}
+          </span>
         </div>
       </div>
 

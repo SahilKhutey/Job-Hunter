@@ -10,17 +10,21 @@ class UserIntelligenceEngine:
             return []
             
         skill_map = {
-            "py": "Python",
-            "reactjs": "React",
-            "react.js": "React",
-            "node": "Node.js",
-            "js": "JavaScript",
-            "ts": "TypeScript",
-            "aws": "AWS",
-            "gcp": "Google Cloud",
-            "k8s": "Kubernetes",
             "ml": "Machine Learning",
-            "ai": "Artificial Intelligence"
+            "ai": "Artificial Intelligence",
+            "aws": "AWS",
+            "azure": "Azure",
+            "docker": "Docker",
+            "container": "Docker",
+            "graphql": "GraphQL",
+            "rest": "REST API",
+            "nosql": "NoSQL",
+            "sql": "SQL",
+            "postgres": "PostgreSQL",
+            "postgre": "PostgreSQL",
+            "tailwind": "Tailwind CSS",
+            "next": "Next.js",
+            "nextjs": "Next.js"
         }
         
         normalized = []
@@ -33,6 +37,14 @@ class UserIntelligenceEngine:
         return list(set(normalized))
 
     @staticmethod
+    def analyze_seniority(years: int) -> str:
+        """Determines seniority based on experience years."""
+        if years < 2: return "Junior"
+        if years < 5: return "Mid-Level"
+        if years < 10: return "Senior"
+        return "Staff / Principal"
+
+    @staticmethod
     def parse_duration(text: str) -> str:
         """Extracts experience duration from text."""
         if not text:
@@ -40,6 +52,41 @@ class UserIntelligenceEngine:
             
         match = re.search(r'(\d+)\s+(year|month|yr|mo)s?', text.lower())
         return match.group(0) if match else "unknown"
+
+    @staticmethod
+    def _extract_skills(text: str) -> List[str]:
+        """Simple keyword extractor for skills."""
+        # In production, this uses an NLP model
+        keywords = ["python", "react", "docker", "aws", "fastapi", "typescript", "kubernetes", "postgres", "sql", "graphql"]
+        text_lower = text.lower()
+        return [k for k in keywords if k in text_lower]
+
+    @staticmethod
+    def analyze_job_match(job_description: str, profile_data: dict) -> dict:
+        """Analyze job description and profile to return match score and gap analysis."""
+        # This would be an LLM call in production
+        # Here we simulate with high-fidelity logic
+        job_skills = UserIntelligenceEngine._extract_skills(job_description)
+        user_skills = set(profile_data.get("skills", []))
+        user_skills_lower = {s.lower() for s in user_skills}
+        
+        matched = [s for s in job_skills if s in user_skills_lower]
+        missing = [s for s in job_skills if s not in user_skills_lower]
+        
+        score = len(matched) / len(job_skills) if job_skills else 0
+        
+        # Add upskilling advice
+        upskill_advice = ""
+        if missing:
+            upskill_advice = f"Focus on gaining experience with {missing[0]}. It's a critical requirement for this role."
+
+        return {
+            "score": round(score, 2),
+            "matched_skills": matched,
+            "missing_skills": missing,
+            "upskill_advice": upskill_advice,
+            "seniority_match": True # Simplified
+        }
 
     @staticmethod
     def build_skill_graph(profile: Dict[str, Any]) -> Dict[str, Any]:

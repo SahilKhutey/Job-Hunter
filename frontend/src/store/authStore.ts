@@ -17,6 +17,7 @@ interface AuthState {
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
   fetchUser: () => Promise<void>;
+  launchDemo: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -71,5 +72,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       authLogout();
       set({ user: null, isAuthenticated: false, isInitialLoading: false });
     }
+  },
+
+  launchDemo: async () => {
+    const res = await api.post("/auth/demo");
+    const { access_token, refresh_token } = res.data;
+
+    setAccessToken(access_token);
+    localStorage.setItem("refresh_token", refresh_token);
+
+    const userRes = await api.get("/user/me");
+    set({ user: userRes.data, isAuthenticated: true, isInitialLoading: false });
   },
 }));

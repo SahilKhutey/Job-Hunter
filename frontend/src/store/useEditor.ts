@@ -27,6 +27,7 @@ interface EditorState {
   
   setVariant: (name: string) => void;
   initializeFromProfile: (profile: ProfileData) => void;
+  initializeFromTailored: (resume: any) => void;
   exportToProfile: () => Partial<ProfileData>;
   clear: () => void;
 }
@@ -134,6 +135,56 @@ export const useEditor = create<EditorState>((set, get) => ({
 
     set({ blocks, variants, currentVariant: "Standard" });
   },
+
+  initializeFromTailored: (tailored) => {
+    const { profile } = useUserStore.getState();
+    const blocks: Block[] = [];
+    
+    // Always preserve Name and Title from profile
+    if (profile) {
+        blocks.push({ id: uuid(), type: "heading1", content: profile.full_name });
+        if (profile.job_title || tailored.job_title) {
+            blocks.push({ id: uuid(), type: "text", content: tailored.job_title || profile.job_title });
+        }
+    } else {
+        if (tailored.full_name) blocks.push({ id: uuid(), type: "heading1", content: tailored.full_name });
+        if (tailored.job_title) blocks.push({ id: uuid(), type: "text", content: tailored.job_title });
+    }
+
+    if (tailored.summary) {
+        blocks.push({ id: uuid(), type: "text", content: tailored.summary });
+    }
+
+    if (tailored.experience && tailored.experience.length > 0) {
+        blocks.push({ id: uuid(), type: "heading2", content: "Experience" });
+        tailored.experience.forEach((exp: any) => {
+            blocks.push({ id: uuid(), type: "text", content: `${exp.role || exp.title} · ${exp.company} · ${exp.duration}` });
+            if (exp.bullets) {
+                exp.bullets.forEach((b: string) => {
+                    blocks.push({ id: uuid(), type: "bullet", content: b });
+                });
+            } else if (exp.description) {
+                blocks.push({ id: uuid(), type: "text", content: exp.description });
+            }
+        });
+    }
+
+    if (tailored.skills && tailored.skills.length > 0) {
+        blocks.push({ id: uuid(), type: "heading2", content: "Skills" });
+        const skillsText = Array.isArray(tailored.skills) ? tailored.skills.join(" · ") : tailored.skills;
+        blocks.push({ id: uuid(), type: "text", content: skillsText });
+    }
+
+    if (tailored.education && tailored.education.length > 0) {
+        blocks.push({ id: uuid(), type: "heading2", content: "Education" });
+        tailored.education.forEach((edu: any) => {
+            blocks.push({ id: uuid(), type: "text", content: `${edu.degree} · ${edu.institution || edu.institute} · ${edu.year}` });
+        });
+    }
+
+    set({ blocks });
+  },
+
 
   exportToProfile: () => {
     const { blocks, variants, currentVariant } = get();

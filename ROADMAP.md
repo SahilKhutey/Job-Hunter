@@ -9,7 +9,7 @@ The vision for **Job Hunter OS** is to move beyond "search and apply" into **Aut
 - [x] **ATS Simulation**: Semantic matching and structural audit feedback.
 
 ## 🚀 Phase 2: Autonomous Execution (Next)
-- [ ] **Playwright Apply Agent**: Fully automated application form filling on LinkedIn/Indeed/Glassdoor.
+- [/] **Playwright Apply Agent**: Fully automated application form filling (Foundations implemented in `ExecutionAgent`).
 - [ ] **Browser Fingerprinting & Persistence**: Dedicated browser contexts to maintain login state without triggering anti-bot measures.
 - [ ] **Human-in-the-Loop (HITL) Dashboard**: Real-time observability of agent actions with a "Manual Override" toggle.
 - [ ] **Multi-Agent Pipeline**: Parallel job scraping, matching, and tailoring.

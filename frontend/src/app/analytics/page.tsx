@@ -14,10 +14,13 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getDashboardStats(profileId ?? undefined)
-      .then(setStats)
-      .finally(() => setLoading(false));
+    if (profileId) {
+      getDashboardStats(profileId)
+        .then(setStats)
+        .finally(() => setLoading(false));
+    }
   }, [profileId]);
+
 
   const total = stats?.total_applications ?? 0;
   const responses = stats?.responses ?? 0;
@@ -50,6 +53,29 @@ export default function AnalyticsPage() {
         <h1 className="text-xl font-bold text-white">Analytics</h1>
         <p className="text-xs text-neutral-500 mt-1">Real-time performance metrics from your job hunt</p>
       </div>
+
+      {/* AI Strategic Insights */}
+      {!loading && stats?.ai_insights && stats.ai_insights.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          {stats.ai_insights.map((insight, idx) => (
+            <div 
+              key={idx} 
+              className={`p-4 rounded-2xl border flex gap-3 items-start animate-slide-up ${
+                insight.type === 'warning' ? 'bg-amber-500/5 border-amber-500/20 text-amber-200' :
+                insight.type === 'success' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-200' :
+                'bg-sky-500/5 border-sky-500/20 text-sky-200'
+              }`}
+              style={{ animationDelay: `${idx * 100}ms` }}
+            >
+              <span className="material-icons-round text-[20px] shrink-0 mt-0.5">
+                {insight.type === 'warning' ? 'warning_amber' : 
+                 insight.type === 'success' ? 'auto_awesome' : 'info'}
+              </span>
+              <p className="text-xs font-medium leading-relaxed">{insight.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-4 gap-4">

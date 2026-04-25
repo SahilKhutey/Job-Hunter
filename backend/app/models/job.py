@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKe
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.models.user import User # Added to resolve relationship mapping
 
 class Job(Base):
     __tablename__ = "jobs"

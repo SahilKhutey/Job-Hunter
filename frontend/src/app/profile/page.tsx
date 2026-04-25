@@ -250,7 +250,8 @@ export default function ProfileStudioPage() {
                       <p className="text-xs text-neutral-500 mb-2">{exp.company}</p>
                       {exp.bullets?.length > 0 && (
                         <ul className="space-y-1">
-                          {exp.bullets.map((b, j) => (
+                          {exp.bullets.map((b: string, j: number) => (
+
                             <li key={j} className="text-xs text-neutral-400 flex items-start gap-2">
                               <span className="w-1 h-1 rounded-full bg-violet-500 mt-1.5 shrink-0" />
                               {b}

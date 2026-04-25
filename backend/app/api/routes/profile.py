@@ -154,14 +154,19 @@ async def upload_resume(
 
     # Merge extracted into profile
     profile.raw_resume_text = text
+    if extracted.get("summary"):
+        profile.summary = extracted["summary"]
+    
     sd = profile.structured_data or {}
-    sd.update({k: v for k, v in extracted.items() if v and k not in ("full_name", "email")})
+    sd.update({k: v for k, v in extracted.items() if v and k not in ("full_name", "email", "summary")})
     profile.structured_data = sd
     profile.skills = extracted.get("skills", profile.skills or [])
 
     # Merge top-level fields only if not already set
     if not profile.full_name and extracted.get("full_name"):
         profile.full_name = extracted["full_name"]
+    if not profile.phone and extracted.get("phone"):
+        profile.phone = extracted["phone"]
 
     github_username = (profile.structured_data or {}).get("github_username")
     github_data = []

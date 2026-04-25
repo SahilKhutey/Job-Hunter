@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, Any
 from app.agents.execution_agent import ExecutionAgent
 from app.ai.llm_client import llm_client
+from app.utils.audit_logger import audit_logger
 from app.api.routes.websocket import emit_agent_update, emit_automation_step
 from app.models.job import Application
 from sqlalchemy.orm import Session
@@ -11,16 +12,25 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-class ApplicationAgent:
+from app.agents.base_agent import BaseAgent
+
+class ApplicationAgent(BaseAgent):
     """
     High-level agent that orchestrates a single job application.
     Uses AI to understand form fields and determine actions.
     """
-    def __init__(self, user_id: str, profile_data: Dict[str, Any], db: Session):
+    def __init__(self, user_id: str = "0", profile_data: Dict[str, Any] = None, db: Session = None):
+        super().__init__("application")
         self.user_id = user_id
-        self.profile = profile_data
+        self.profile = profile_data or {}
         self.db = db
         self.browser = ExecutionAgent(user_id)
+
+    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        # This is a placeholder for the pipeline orchestrator
+        # In a real run, this would trigger the async apply()
+        logger.info(f"[Agent: {self.name}] Application logic would execute here.")
+        return state
 
     async def apply(self, job_id: int, job_url: str, tailored_resume_path: str):
 
@@ -28,6 +38,10 @@ class ApplicationAgent:
         Main loop for applying to a job.
         """
         try:
+            audit_logger.log_event("APPLICATION_START", self.user_id, {
+                "job_id": job_id,
+                "job_url": job_url
+            })
             await emit_agent_update("ExecutionAgent", "running", f"Starting application for {job_url}")
             await self.browser.start(headless=False) # Visual for debugging
             
@@ -97,24 +111,29 @@ class ApplicationAgent:
         """
         Uses LLM to map user profile data to the identified page elements.
         """
-        logger.info(f"AI mapping {len(elements)} elements to user profile...")
+        await emit_agent_update("AutomationAgent", "running", f"AI mapping {len(elements)} elements to profile...")
         
-        # Simple heuristic mapping for prototype
-        # In production, we'd send 'elements' to LLM to get a precise action plan
-        for el in elements:
-            tag = el['tag'].lower()
-            label = el['label'].lower() or el['placeholder'].lower() or el['name'].lower()
+        actions = llm_client.map_form_fields(self.profile, elements)
+        
+        for action in actions:
+            selector = action.get("selector")
+            act_type = action.get("action")
+            value = action.get("value")
+            reason = action.get("reason", "No reason provided")
             
-            # Profile Mapping
-            if 'first name' in label:
-                await self.browser.fill_input(f"input[name='{el['name']}']", self.profile.get('full_name', '').split()[0])
-            elif 'last name' in label:
-                await self.browser.fill_input(f"input[name='{el['name']}']", self.profile.get('full_name', '').split()[-1])
-            elif 'email' in label:
-                await self.browser.fill_input(f"input[name='{el['name']}']", self.profile.get('email', ''))
-            elif 'phone' in label:
-                await self.browser.fill_input(f"input[name='{el['name']}']", self.profile.get('phone', ''))
-            elif tag == 'button' and 'apply' in label:
-                # Potential next step or submit
-                pass
+            if not selector or not act_type:
+                continue
+                
+            await emit_automation_step(f"Action: {act_type} on {selector}", "in_progress")
+            logger.info(f"Executing: {act_type} on {selector} ({reason})")
+            
+            try:
+                if act_type == "type" and value:
+                    await self.browser.fill_input(selector, value)
+                elif act_type == "click":
+                    await self.browser.click_element(selector)
+                await emit_automation_step(f"Action: {act_type} on {selector}", "completed")
+            except Exception as e:
+                logger.error(f"Failed action {act_type} on {selector}: {e}")
+                await emit_automation_step(f"Action: {act_type} on {selector}", "error")
 

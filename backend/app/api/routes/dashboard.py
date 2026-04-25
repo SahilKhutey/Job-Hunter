@@ -8,6 +8,8 @@ from typing import Optional
 router = APIRouter()
 
 
+from app.services.analytics_service import analytics_service
+
 @router.get("/stats")
 def dashboard_stats(
     profile_id: Optional[int] = Query(None),
@@ -15,15 +17,13 @@ def dashboard_stats(
 ):
     """Return real application statistics for the dashboard."""
     total_jobs = db.query(Job).count()
-    total_applications = db.query(Application).count()
-
-    # Status breakdown
-    pending = db.query(Application).filter(Application.status == "pending").count()
-    applied = db.query(Application).filter(Application.status == "applied").count()
-    interviews = db.query(Application).filter(Application.status == "interview").count()
-    offers = db.query(Application).filter(Application.status == "offer").count()
-    rejected = db.query(Application).filter(Application.status == "rejected").count()
-    responses = applied + interviews + offers  # Any non-pending outcome
+    applications = db.query(Application).all()
+    
+    # Compute base stats
+    base_stats = analytics_service.compute_dashboard_stats(applications)
+    resume_perf = analytics_service.analyze_resume_performance(applications)
+    platform_perf = analytics_service.analyze_platform_performance(applications)
+    ai_insights = analytics_service.generate_ai_insights(base_stats, resume_perf, platform_perf)
 
     # AI matches
     auto_ready = db.query(Job).filter(Job.ai_decision == "AUTO_APPLY_READY").count()
@@ -31,22 +31,17 @@ def dashboard_stats(
 
     return {
         "total_jobs_analyzed": total_jobs,
-        "total_applications": total_applications,
-        "applications_this_week": total_applications,  # Simplified — could filter by date
-        "responses": responses,
-        "interviews": interviews,
-        "offers": offers,
+        "total_applications": base_stats["total_applications"],
+        "responses": sum(1 for a in applications if a.status in ["applied", "interview", "offer"]),
+        "interviews": sum(1 for a in applications if a.status == "interview"),
+        "offers": sum(1 for a in applications if a.status == "offer"),
         "ai_matches_above_threshold": auto_ready + review,
-        "auto_ready_count": auto_ready,
-        "response_rate": round((responses / total_applications * 100), 1) if total_applications > 0 else 0,
-        "interview_rate": round((interviews / total_applications * 100), 1) if total_applications > 0 else 0,
-        "status_breakdown": {
-            "pending": pending,
-            "applied": applied,
-            "interview": interviews,
-            "offer": offers,
-            "rejected": rejected,
-        }
+        "response_rate": base_stats["interview_rate"], # For backward compatibility in UI
+        "interview_rate": base_stats["interview_rate"],
+        "status_breakdown": base_stats["status_breakdown"],
+        "ai_insights": ai_insights,
+        "resume_performance": resume_perf,
+        "platform_performance": platform_perf
     }
 
 

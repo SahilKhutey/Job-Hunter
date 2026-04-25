@@ -12,6 +12,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     provider = Column(String, nullable=True)  # google / linkedin
     provider_id = Column(String, nullable=True)
+    extension_token = Column(String, unique=True, index=True, nullable=True)
 
     
     # Relationships

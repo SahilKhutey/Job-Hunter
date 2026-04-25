@@ -19,9 +19,12 @@
 - **🔐 Trust Layer**: Production-ready JWT authentication with Google & LinkedIn OAuth integration.
 - **📄 Tailoring Engine**: AI-powered per-job resume optimization. Every application gets a unique, high-impact PDF.
 - **📊 ATS Simulation**: A sophisticated scoring loop using semantic embeddings and structural rules to predict how recruiters see your resume.
-- **⚡ Auto-Fix Loop**: Don't just find gaps—automatically bridge them. HunterOS suggests and implements improvements to increase your match score.
+- **🎙️ Interview Simulator**: Real-time AI coaching and roleplay to master your interviews before they happen.
+- **⚖️ Negotiation Copilot**: Strategic offer analysis and leverage calculation to maximize your compensation.
+- **🧩 Browser Extension HUD**: Real-time Heads-Up Display for LinkedIn, Indeed, and Greenhouse for instant match scores.
+- **🛡️ Privacy Shield**: Built-in PII masking and anonymized data processing for a zero-leak career search.
+- **💓 Resilience Monitor**: Autonomous heartbeat monitoring and self-healing engine for 24/7 reliability.
 - **📱 Multi-Platform Ecosystem**: Integrated Mobile (Expo) for monitoring and Desktop (Electron) for high-performance automation execution.
-
 - **🕵️ Multi-Agent Orchestration**: A backend architecture designed for parallel job scraping, analysis, and execution.
 
 
@@ -45,6 +48,7 @@ Job-Hunter/
 ├── frontend/               # Next.js Web Dashboard
 ├── desktop/                # Electron App (Execution Engine)
 ├── mobile/                 # Expo App (Mission Control)
+├── extension/              # Browser Extension HUD
 ├── docker-compose.yml      # Container Orchestration
 └── ROADMAP.md              # Future Vision & Goals
 
@@ -76,13 +80,21 @@ Job-Hunter/
    source venv/bin/activate  # or venv\Scripts\activate on Windows
    pip install -r requirements.txt
    # Setup .env (see .env.example)
-   python main.py
+   python run_backend.py
    ```
 
 3. **Frontend Setup**:
    ```bash
    cd frontend
    npm install
+   npm run dev
+   ```
+
+4. **Desktop Setup**:
+   ```bash
+   cd desktop
+   npm install
+   npx playwright install chromium
    npm run dev
    ```
 

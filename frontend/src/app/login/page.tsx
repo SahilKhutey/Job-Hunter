@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { useUserStore } from "@/store/useUserStore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
+import { LogIn, Mail, Lock, Loader2, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
+  const launchDemo = useAuthStore((s) => s.launchDemo);
+  const setProfileId = useUserStore((s) => s.setProfileId);
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -21,11 +25,30 @@ export default function LoginPage() {
     setError("");
     try {
       await login(email, password);
+      // We might need to fetch the profile ID here if the backend returns it
       router.push("/automation");
     } catch (err: any) {
       setError(err.response?.data?.detail || "Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLaunch = async () => {
+    setDemoLoading(true);
+    setError("");
+    try {
+      await launchDemo();
+      const user = useAuthStore.getState().user;
+      if (user) {
+        setProfileId(user.id); // Assuming user ID matches profile ID for demo
+      }
+      router.push("/"); // Go to main dashboard
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(detail || "Demo service is currently unavailable. Please try again later.");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -131,6 +154,27 @@ export default function LoginPage() {
                 <img src="https://www.linkedin.com/favicon.ico" className="w-4 h-4" alt="LinkedIn" />
                 <span className="text-sm font-medium">LinkedIn</span>
               </button>
+            </div>
+
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={handleDemoLaunch}
+                disabled={demoLoading}
+                className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-white hover:bg-neutral-200 text-black font-bold rounded-2xl shadow-glow-white hover:shadow-glow-lg transition-all active:scale-[0.98]"
+              >
+                {demoLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-violet-600" />
+                    <span>Launch Demo Account</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] text-neutral-500 text-center mt-2 font-medium uppercase tracking-widest">
+                No setup required • Full Access
+              </p>
             </div>
           </form>
 

@@ -32,6 +32,25 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     return generate_tokens(user)
 
 
+@router.post("/demo", response_model=TokenResponse)
+def demo_login(db: Session = Depends(get_db)):
+    """
+    One-click demo login. Ensures demo user is seeded and returns tokens.
+    """
+    from app.services.demo_service import initialize_demo_account, DEMO_PASSWORD
+    
+    # 1. Initialize demo account
+    user = initialize_demo_account(db)
+    
+    # 2. Authenticate (just to be safe/consistent)
+    user = authenticate_user(db, user.email, DEMO_PASSWORD)
+    
+    if not user:
+        raise HTTPException(status_code=500, detail="Demo initialization failed")
+        
+    return generate_tokens(user)
+
+
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(refresh_token: str):
     from app.auth.jwt_handler import decode_token
@@ -48,3 +67,17 @@ def refresh(refresh_token: str):
         "refresh_token": create_refresh_token({"sub": user_id}),
         "token_type": "bearer"
     }
+import secrets
+from app.auth.dependencies import get_current_user
+from app.models.user import User
+
+@router.post("/extension-token")
+def generate_extension_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a high-entropy long-lived token for the browser extension."""
+    token = "hos_ext_" + secrets.token_urlsafe(32)
+    current_user.extension_token = token
+    db.commit()
+    return {"token": token}

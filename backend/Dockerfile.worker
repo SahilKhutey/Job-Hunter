@@ -1,11 +1,12 @@
 # backend/Dockerfile.worker
-FROM python:3.11-slim
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
+# Install system dependencies for PostgreSQL and other tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -14,7 +15,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Ensure playwright is fully installed with dependencies
+RUN playwright install chromium
+
 COPY . .
 
 # Run Celery worker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD celery -A app.worker inspect ping || exit 1
+
 CMD ["celery", "-A", "app.worker", "worker", "--loglevel=info"]
+

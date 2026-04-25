@@ -37,7 +37,7 @@ app.whenReady().then(() => {
 
     # IPC Handlers
     ipcMain.handle('run-automation', async (event, { jobUrl, profileData, resumePath }) => {
-        return await runAutomation(jobUrl, profileData, resumePath);
+        return await runAutomation(event, jobUrl, profileData, resumePath);
     });
 
 

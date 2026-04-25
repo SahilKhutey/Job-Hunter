@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "HunterOS HUD",
+  "version": "1.0.0",
+  "description": "Premium Career Intelligence & Real-Time Job Analysis HUD.",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.linkedin.com/*",
+    "https://*.indeed.com/*",
+    "https://*.greenhouse.io/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.linkedin.com/jobs/*",
+        "https://*.indeed.com/viewjob*",
+        "https://*.indeed.com/jobs*"
+      ],
+      "js": ["content.js"],
+      "css": ["hud.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

@@ -2,6 +2,7 @@ from openai import OpenAI
 from app.core.config import settings
 from typing import Dict, Any, List
 import json
+from app.utils.privacy import privacy_shield
 
 EXTRACTION_PROMPT = """
 Extract structured information from this resume.
@@ -9,9 +10,13 @@ Return JSON with:
 - full_name
 - email
 - phone
-- skills
-- education (list)
-- experience (list of dicts with role, company, duration, description)
+- summary (concise professional summary)
+- skills (list of strings)
+- total_experience_years (number)
+- top_5_skills (list)
+- suggested_job_titles (list)
+- education (list of dicts with degree, institute, year)
+- experience (list of dicts with title, company, duration, bullets)
 - projects (list of dicts with name, description, tech)
 - links (linkedin, github, portfolio)
 Resume:
@@ -123,18 +128,36 @@ JSON:
 ]
 """
 
+MAP_FORM_PROMPT = """
+You are a browser automation expert.
+Map the following browser DOM elements to the user's profile fields.
+USER PROFILE:
+{profile}
+DOM ELEMENTS:
+{elements}
+Return a JSON list of actions:
+[
+  {"selector": "...", "action": "type", "value": "...", "reason": "..."},
+  {"selector": "...", "action": "click", "reason": "..."}
+]
+Only map fields that clearly correspond to profile data.
+"""
+
 class LLMClient:
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def _call_json(self, prompt: str, system_msg: str) -> Dict[str, Any]:
         try:
+            # Privacy Shield: Redact PII before sending to external LLM
+            clean_prompt = privacy_shield.mask_pii(prompt)
+            
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 response_format={ "type": "json_object" },
                 messages=[
                     {"role": "system", "content": system_msg},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": clean_prompt}
                 ],
                 temperature=0.1
             )
@@ -145,11 +168,14 @@ class LLMClient:
 
     def _call_text(self, prompt: str, system_msg: str, temperature: float = 0.5) -> str:
         try:
+            # Privacy Shield: Redact PII before sending to external LLM
+            clean_prompt = privacy_shield.mask_pii(prompt)
+
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=[
                     {"role": "system", "content": system_msg},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": clean_prompt}
                 ],
                 temperature=temperature
             )
@@ -201,6 +227,16 @@ class LLMClient:
         # Sometimes the LLM nests the array under a key like "answers"
         if isinstance(res, dict):
             for k, v in res.items():
+                if isinstance(v, list):
+                    return v
+        return []
+
+    def map_form_fields(self, profile: Dict[str, Any], elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        res = self._call_json(MAP_FORM_PROMPT.format(profile=json.dumps(profile), elements=json.dumps(elements)), "You are a form automation expert. Always return valid JSON.")
+        if isinstance(res, list):
+            return res
+        if isinstance(res, dict):
+            for v in res.values():
                 if isinstance(v, list):
                     return v
         return []

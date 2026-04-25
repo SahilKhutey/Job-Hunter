@@ -56,6 +56,14 @@ async def emit_automation_step(step: str, status: str):
     })
 
 
+async def emit_browser_view(image_base64: str):
+    """Streams a live screenshot to the frontend."""
+    await manager.broadcast({
+        "type": "browser_view",
+        "image": image_base64,
+    })
+
+
 # ── WebSocket Route with Security ─────────────────────────────────────────────
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(None)):

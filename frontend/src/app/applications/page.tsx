@@ -1,13 +1,33 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ResumePreview from '@/components/ResumePreview';
 import { useUserStore } from '@/store/useUserStore';
-import { FileText, MessageSquare, Save, Play } from 'lucide-react';
+import { FileText, MessageSquare, Save, Play, X } from 'lucide-react';
+import ExecutionTerminal from '@/components/ExecutionTerminal';
+import { useDesktopBridge, abortLocalAutomation } from '@/lib/desktopBridge';
 
 export default function ApplicationStudio() {
   const [activeTab, setActiveTab] = useState<'resume' | 'cover_letter'>('resume');
-  const user = useUserStore((state) => state.user);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const user = useUserStore((state) => state.profile);
+  const { isDesktop, onAgentUpdate } = useDesktopBridge();
+
+  useEffect(() => {
+    if (isExecuting) {
+        return onAgentUpdate((log) => {
+            setLogs(prev => [...prev, { ...log, id: Math.random().toString(), time: new Date().toLocaleTimeString().split(' ')[0] }]);
+        });
+    }
+  }, [isExecuting]);
+
+  const handleExecute = () => {
+    setIsExecuting(true);
+    setLogs([{ id: 'start', agent: 'System', message: 'Initializing Autonomous Engine...', time: new Date().toLocaleTimeString().split(' ')[0], type: 'info' }]);
+    // In a real app, this would trigger the actual IPC call
+  };
+
 
   // Mock JSON resume for UI
   const mockResume = {
@@ -31,8 +51,12 @@ export default function ApplicationStudio() {
           <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors border border-gray-700">
             <Save className="w-4 h-4" /> Save Draft
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors shadow-lg shadow-indigo-500/20">
-            <Play className="w-4 h-4" /> Execute Auto-Apply
+          <button 
+            onClick={handleExecute}
+            disabled={isExecuting}
+            className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors shadow-lg ${isExecuting ? 'bg-gray-700 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'}`}
+          >
+            <Play className="w-4 h-4" /> {isExecuting ? 'Agent Running...' : 'Execute Auto-Apply'}
           </button>
         </div>
       </div>
@@ -90,6 +114,17 @@ export default function ApplicationStudio() {
           )}
         </div>
       </div>
+      
+      {isExecuting && (
+        <ExecutionTerminal 
+          logs={logs} 
+          onAbort={async () => {
+            await abortLocalAutomation();
+            setIsExecuting(false);
+            setLogs([]);
+          }} 
+        />
+      )}
     </div>
   );
 }

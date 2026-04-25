@@ -74,30 +74,47 @@ class AnalyticsService:
             
         return platforms
 
-    def generate_ai_insights(self, stats: Dict[str, Any], resume_perf: Dict[str, Any]):
+    def generate_ai_insights(self, stats: Dict[str, Any], resume_perf: Dict[str, Any], platform_perf: Dict[str, Any]):
         """
         Generates actionable recommendations based on data patterns.
         """
         insights = []
         
-        # Interview Rate Insight
-        if stats["interview_rate"] < 10 and stats["total_applications"] > 20:
+        # 1. Interview Rate Insight
+        if stats.get("interview_rate", 0) < 10 and stats.get("total_applications", 0) > 10:
             insights.append({
                 "type": "warning",
                 "message": "Low conversion rate detected. Your resume might be missing critical keywords for current target roles."
             })
-        elif stats["interview_rate"] > 25:
+        elif stats.get("interview_rate", 0) > 25:
             insights.append({
                 "type": "success",
                 "message": "Exceptional interview rate! Your tailoring strategy is highly effective."
             })
 
-        # Resume Version Insight
+        # 2. Resume Version Insight
         if len(resume_perf) > 1:
             best_v = max(resume_perf, key=lambda x: resume_perf[x]["rate"])
+            if resume_perf[best_v]["rate"] > 0:
+                insights.append({
+                    "type": "info",
+                    "message": f"Resume version '{best_v}' is outperforming others. Consider using this structure as your primary template."
+                })
+            
+        # 3. Platform Insight
+        if platform_perf:
+            best_p = max(platform_perf, key=lambda x: platform_perf[x]["rate"])
+            if platform_perf[best_p]["rate"] > 0:
+                insights.append({
+                    "type": "success",
+                    "message": f"You have the highest success rate on {best_p}. Double down on applications via this platform."
+                })
+
+        # 4. Volume Insight
+        if stats.get("total_applications", 0) < 5:
             insights.append({
                 "type": "info",
-                "message": f"Resume version '{best_v}' is outperforming others. Consider using this structure as your primary template."
+                "message": "Data volume is low. Submit more applications to unlock predictive conversion analytics."
             })
 
         return insights

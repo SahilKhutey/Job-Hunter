@@ -38,7 +38,8 @@ class MatchingEngine:
         skill_match_ratio = len(intersection) / len(job_skills) if job_skills else 0.5
         
         # Vector Similarity
-        user_text = f"{profile.job_title}. {profile.summary or ''} {' '.join(profile.skills or [])}"
+        job_title = (profile.structured_data or {}).get("job_title", "")
+        user_text = f"{job_title}. {profile.summary or ''} {' '.join(profile.skills or [])}"
         job_text = f"{job.title}. {job.description[:500]}"
         
         u_emb = embedding_service.get_embedding(user_text)

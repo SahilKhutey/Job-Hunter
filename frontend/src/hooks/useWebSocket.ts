@@ -3,24 +3,27 @@
 import { useEffect, useRef } from "react";
 import { connectSocket } from "@/lib/websocket";
 import { useRealtime } from "@/store/useRealtime";
-import { useAuth } from "@/store/useAuth";
+import { useAuthStore } from "@/store/authStore";
+import { getAccessToken } from "@/lib/auth";
 
 export default function useWebSocket() {
   const { addLog, addAutomation, setWsStatus, setScreenshot, setPendingConfirmation } = useRealtime();
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuthStore();
   const wsRef = useRef<WebSocket | null>(null);
-
   useEffect(() => {
-    if (!isAuthenticated || !token) {
+    const currentToken = getAccessToken();
+    
+    if (!isAuthenticated || !currentToken) {
         if (wsRef.current) {
             wsRef.current.close();
             wsRef.current = null;
         }
+        setWsStatus("disconnected");
         return;
     }
 
     const ws = connectSocket(
-      token,
+      currentToken,
       (data) => {
         if (data.type === "agent_update") {
           addLog({ agent: data.agent, status: data.status, message: data.message });
@@ -42,7 +45,7 @@ export default function useWebSocket() {
     return () => {
       wsRef.current?.close();
     };
-  }, [isAuthenticated, token, addLog, addAutomation, setWsStatus, setScreenshot, setPendingConfirmation]);
+  }, [isAuthenticated, addLog, addAutomation, setWsStatus, setScreenshot, setPendingConfirmation]);
 
   return wsRef;
 }

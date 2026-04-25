@@ -55,7 +55,7 @@ export default function BlockEditor({ block, isFocused, onFocus }: BlockProps) {
 
   return (
     <div
-      className={`group relative flex gap-2 items-start py-0.5 rounded-lg transition-all ${isFocused ? "bg-violet-50/30" : "hover:bg-gray-50/50"}`}
+      className={`group relative flex gap-2 items-start py-1 px-2 rounded-lg transition-all border border-transparent ${isFocused ? "bg-violet-50/50 border-violet-100 shadow-sm" : "hover:bg-neutral-50 hover:border-neutral-100"}`}
       onClick={onFocus}
     >
       {/* Bullet marker */}
@@ -87,35 +87,39 @@ export default function BlockEditor({ block, isFocused, onFocus }: BlockProps) {
 
       {/* Floating toolbar (shows on focus) */}
       {isFocused && (
-        <div className="absolute -right-2 top-0 translate-x-full flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-sm px-1.5 py-1 z-10 animate-fade-in">
+        <div className="absolute right-0 -top-8 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-xl px-1.5 py-1 z-50 animate-slide-up border-b-2 border-b-violet-500">
           {/* Block type picker */}
           <select
             value={block.type}
             onChange={(e) => updateBlockType(block.id, e.target.value as BlockType)}
-            className="text-[10px] text-gray-500 bg-transparent border-none outline-none cursor-pointer"
+            className="text-[10px] font-bold text-violet-600 bg-transparent border-none outline-none cursor-pointer uppercase tracking-tighter"
           >
             {(Object.keys(BLOCK_TYPE_LABELS) as BlockType[]).map((t) => (
-              <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]} — {t}</option>
+              <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
             ))}
           </select>
-          <div className="w-px h-4 bg-gray-200" />
+          <div className="w-px h-4 bg-gray-200 mx-1" />
           {/* Move */}
-          <button onClick={() => moveBlock(block.id, "up")} className="text-gray-400 hover:text-gray-600 text-[12px] px-0.5" title="Move up">↑</button>
-          <button onClick={() => moveBlock(block.id, "down")} className="text-gray-400 hover:text-gray-600 text-[12px] px-0.5" title="Move down">↓</button>
-          <div className="w-px h-4 bg-gray-200" />
+          <button onClick={() => moveBlock(block.id, "up")} className="text-gray-400 hover:text-violet-600 p-0.5" title="Move up">
+            <span className="material-icons-round text-[14px]">expand_less</span>
+          </button>
+          <button onClick={() => moveBlock(block.id, "down")} className="text-gray-400 hover:text-violet-600 p-0.5" title="Move down">
+            <span className="material-icons-round text-[14px]">expand_more</span>
+          </button>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
           {/* AI Rewrite */}
           <button
             onClick={handleAIRewrite}
             disabled={isRewriting}
-            className="flex items-center gap-1 text-[10px] font-medium text-violet-600 hover:text-violet-800 disabled:opacity-50 px-1"
+            className="flex items-center gap-1 text-[10px] font-bold text-violet-600 hover:text-violet-800 disabled:opacity-50 px-1.5 py-0.5 rounded-md bg-violet-50"
           >
             <span className="material-icons-round text-[12px]">{isRewriting ? "sync" : "auto_fix_high"}</span>
-            {isRewriting ? "..." : "AI"}
+            {isRewriting ? "REWRITING..." : "AI TAILOR"}
           </button>
-          <div className="w-px h-4 bg-gray-200" />
+          <div className="w-px h-4 bg-gray-200 mx-1" />
           {/* Delete */}
-          <button onClick={() => removeBlock(block.id)} className="text-gray-300 hover:text-red-400 transition-colors" title="Delete block">
-            <span className="material-icons-round text-[13px]">delete_outline</span>
+          <button onClick={() => removeBlock(block.id)} className="text-gray-300 hover:text-red-500 transition-colors p-0.5" title="Delete block">
+            <span className="material-icons-round text-[14px]">delete</span>
           </button>
         </div>
       )}

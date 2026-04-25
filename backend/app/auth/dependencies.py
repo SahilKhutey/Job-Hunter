@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from app.core.config import settings
-from app.db.session import get_db
+from app.core.database import get_db
 from app.models.user import User
 from app.auth.jwt_handler import ALGORITHM
 from sqlalchemy.orm import Session
@@ -11,7 +11,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 async def get_current_user(
     request: Request,
-    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
     credentials_exception = HTTPException(
@@ -19,26 +18,31 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # 1. Check for Extension Token (X-HOS-Extension-Token)
+    ext_token = request.headers.get("X-HOS-Extension-Token")
+    if ext_token:
+        user = db.query(User).filter(User.extension_token == ext_token).first()
+        if user and user.is_active:
+            return user
+    
+    # 2. Standard OAuth2/JWT logic
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise credentials_exception
+        
+    token = auth_header.split(" ")[1]
     
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-            
-        # Zero-Trust: Context Check (Optional but recommended)
-        # Verify if the IP or User-Agent matches the session (if stored in DB/Redis)
-        # client_ip = request.client.host
-        
     except JWTError:
         raise credentials_exception
         
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
-    
-    # Check if user account is disabled/locked
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
         
     return user

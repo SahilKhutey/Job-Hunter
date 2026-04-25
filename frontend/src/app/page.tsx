@@ -116,6 +116,40 @@ function EmptyPicks() {
   );
 }
 
+// ── Resilience HUD ────────────────────────────────────────────────────────────
+
+function ResilienceHUD() {
+  const [health, setHealth] = useState<any>(null);
+
+  useEffect(() => {
+    const check = () => {
+      fetch("http://localhost:8000/api/v1/health")
+        .then(res => res.json())
+        .then(setHealth)
+        .catch(() => setHealth({ status: "DISCONNECTED" }));
+    };
+    check();
+    const timer = setInterval(check, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isHealthy = health?.status === "HEALTHY";
+  const isOptimal = health?.status === "OPTIMAL" || isHealthy;
+
+  return (
+    <div className="flex items-center gap-2 bg-neutral-900/40 border border-neutral-800/60 px-3 py-1.5 rounded-full">
+      <div className={`w-2 h-2 rounded-full animate-pulse ${
+        isOptimal ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : 
+        health?.status === "DEGRADED" ? "bg-amber-500 shadow-[0_0_8px_#f59e0b]" : 
+        "bg-red-500 shadow-[0_0_8px_#ef4444]"
+      }`} />
+      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+        {isOptimal ? "Engine Optimal" : health?.status === "DEGRADED" ? "Engine Degraded" : "Engine Offline"}
+      </span>
+    </div>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -148,12 +182,15 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
       {/* Greeting & Resume Strength */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-            Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"},{" "}
-            <span className="text-violet-400">{profile?.full_name?.split(" ")[0] ?? "Hunter"}</span> 👋
-          </h1>
-          <p className="text-xs text-neutral-500 mt-1">Sovereign intelligence is monitoring your career pipeline.</p>
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+              Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"},{" "}
+              <span className="text-violet-400">{profile?.full_name?.split(" ")[0] ?? "Hunter"}</span> 👋
+            </h1>
+            <p className="text-xs text-neutral-500 mt-1">Sovereign intelligence is monitoring your career pipeline.</p>
+          </div>
+          <ResilienceHUD />
         </div>
 
         {/* Resume Strength Meter */}
