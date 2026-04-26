@@ -36,6 +36,22 @@ export default function JobCard({ job }: JobCardProps) {
         </div>
       </div>
 
+      {job.match_analytics && job.match_analytics.missing_skills.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">Missing Skills</p>
+          <div className="flex flex-wrap gap-1.5">
+            {job.match_analytics.missing_skills.slice(0, 3).map(skill => (
+              <span key={skill} className="px-1.5 py-0.5 bg-red-500/10 text-red-400 text-[10px] rounded border border-red-500/20">
+                {skill}
+              </span>
+            ))}
+            {job.match_analytics.missing_skills.length > 3 && (
+              <span className="text-[10px] text-gray-500 mt-0.5">+{job.match_analytics.missing_skills.length - 3} more</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-6">
         <div className="flex items-center gap-2">
           {isAutoApply ? (

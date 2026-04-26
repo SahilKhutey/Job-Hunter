@@ -7,6 +7,12 @@ interface Job {
   url: string;
   match_score: number;
   ai_decision: string;
+  match_analytics?: {
+    matched_skills: string[];
+    missing_skills: string[];
+    alignment_ratio: number;
+    recommendation: string;
+  };
 }
 
 interface JobState {

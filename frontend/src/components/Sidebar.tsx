@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, Briefcase, FileText, User, Settings, Activity } from 'lucide-react';
+import { Home, Briefcase, FileText, User, Settings, Activity, Search } from 'lucide-react';
 
 export default function Sidebar() {
   return (
@@ -23,6 +23,9 @@ export default function Sidebar() {
         </Link>
         <Link href="/profile" className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors">
           <User className="w-5 h-5" /> Profile Studio
+        </Link>
+        <Link href="/discovery" className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors">
+          <Search className="w-5 h-5" /> Discovery
         </Link>
       </nav>
 

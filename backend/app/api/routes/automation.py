@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.services.application_engine import application_engine
+from app.agents.discovery_agent import DiscoveryAgent
 from app.core.database import get_db
 from app.models.profile import Profile
 
@@ -55,3 +56,15 @@ async def start_apply(req: ApplicationRequest, db: Session = Depends(get_db)):
 async def get_apply_status(job_id: str):
     status = application_engine.get_status(job_id)
     return {"status": status}
+@router.post("/discover")
+async def discover_jobs(
+    query: str,
+    location: str = "Remote",
+    user_id: str = "0",
+    db: Session = Depends(get_db)
+):
+    """Triggers the DiscoveryAgent to find new jobs."""
+    agent = DiscoveryAgent(user_id, db)
+    # Run in background
+    asyncio.create_task(agent.run({"search_query": query, "search_location": location}))
+    return {"status": "Discovery started", "query": query}
