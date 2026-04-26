@@ -29,9 +29,12 @@ class ExecutionAgent(BaseAgent):
         logger.info(f"[Agent: {self.name}] Browser execution phase.")
         return state
 
-    async def start(self, headless: bool = True):
+    async def start(self, headless: bool = True, platform: str = "generic"):
         """Starts the browser with a persistent context and stealth patches."""
         os.makedirs(self.user_data_dir, exist_ok=True)
+        
+        # Platform specific session path
+        self.session_path = f"{self.user_data_dir}/{platform}_session.json"
         
         self.playwright = await async_playwright().start()
         
@@ -44,7 +47,8 @@ class ExecutionAgent(BaseAgent):
             viewport={'width': 1440, 'height': 900},
             user_agent=ua,
             color_scheme="dark",
-            locale="en-US"
+            locale="en-US",
+            storage_state=self.session_path if os.path.exists(self.session_path) else None
         )
         
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
@@ -53,7 +57,27 @@ class ExecutionAgent(BaseAgent):
         await apply_stealth(self.page)
         await Stealth().apply_stealth_async(self.page)
         
-        logger.info(f"ExecutionAgent started for user {self.user_id} with Advanced Stealth enabled.")
+        logger.info(f"ExecutionAgent started for user {self.user_id} on {platform} with Advanced Stealth.")
+        
+        # Initial Login Detection
+        if await self._detect_login_required():
+            from app.services.automation_service import automation_service
+            logger.warning(f"Login required for {platform}. Pausing for HITL.")
+            await automation_service.request_confirmation(f"login_{platform}")
+
+    async def _detect_login_required(self) -> bool:
+        """Checks if we are stuck on a login or auth wall."""
+        login_indicators = ["login", "signin", "auth", "log in", "sign in"]
+        url = self.page.url.lower()
+        if any(k in url for k in ["login", "auth", "signin"]):
+            return True
+        return False
+
+    async def save_session(self):
+        """Saves the current cookies and storage state."""
+        if self.context and hasattr(self, 'session_path'):
+            await self.context.storage_state(path=self.session_path)
+            logger.info(f"Session saved to {self.session_path}")
 
     async def stop(self):
         """Cleanly closes the browser."""

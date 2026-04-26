@@ -8,6 +8,7 @@ from app.api.routes.websocket import emit_agent_update, emit_automation_step
 from app.models.job import Application
 from sqlalchemy.orm import Session
 from app.services.automation_service import automation_service
+from app.utils.privacy import privacy_shield
 
 
 
@@ -42,8 +43,14 @@ class ApplicationAgent(BaseAgent):
                 "job_id": job_id,
                 "job_url": job_url
             })
-            await emit_agent_update("ExecutionAgent", "running", f"Starting application for {job_url}")
-            await self.browser.start(headless=False)
+            # Detect Platform
+            platform = "generic"
+            if "linkedin.com" in job_url: platform = "linkedin"
+            elif "indeed.com" in job_url: platform = "indeed"
+            elif "greenhouse.io" in job_url: platform = "greenhouse"
+            elif "lever.co" in job_url: platform = "lever"
+            
+            await self.browser.start(headless=False, platform=platform)
             
             await emit_automation_step("Navigating", "in_progress")
             await self.browser.navigate(job_url)
@@ -103,8 +110,13 @@ class ApplicationAgent(BaseAgent):
                 # (Heuristic: LLM will mark the action reason as "submit")
                 # We handle this inside _smart_fill_page or check here
                 
-            if is_complete or step_count >= max_steps:
+            if is_complete:
+                await emit_agent_update("ExecutionAgent", "success", "Application submitted successfully!")
+                await self.browser.save_session()
+            else:
                 await emit_agent_update("ExecutionAgent", "completed", "Application process finished.")
+            
+            logger.info(f"Successfully processed {job_url}")
             
             # Log to Database
             new_app = Application(
@@ -113,7 +125,7 @@ class ApplicationAgent(BaseAgent):
                 status="applied" if is_complete else "processed",
                 resume_path=tailored_resume_path,
                 resume_version="tailored_ai_v1",
-                platform="unknown",
+                platform=platform,
                 application_metadata={"steps_taken": step_count, "final_url": self.browser.page.url}
             )
             self.db.add(new_app)
@@ -136,9 +148,12 @@ class ApplicationAgent(BaseAgent):
         Uses LLM to map user profile data to the identified page elements.
         Returns True if any action was performed.
         """
+        # Tokenize profile to prevent PII leakage to LLM
+        clean_profile, pii_mapping = privacy_shield.tokenize_profile(self.profile)
+        
         await emit_agent_update("AutomationAgent", "running", f"AI mapping {len(elements)} elements to profile...")
         
-        actions = llm_client.map_form_fields(self.profile, elements)
+        actions = llm_client.map_form_fields(clean_profile, elements)
         logger.info(f"AI suggested {len(actions)} actions.")
         actions_taken = 0
         
@@ -163,15 +178,18 @@ class ApplicationAgent(BaseAgent):
             await emit_automation_step(f"Action: {act_type} on {selector}", "in_progress")
             logger.info(f"Executing: {act_type} on {selector} ({reason})")
             
+            # Unmask value (restore real PII from tokens)
+            real_value = privacy_shield.unmask_value(value, pii_mapping)
+            
             try:
-                if act_type == "type" and value:
-                    await self.browser.fill_input(selector, value)
+                if act_type == "type" and real_value:
+                    await self.browser.fill_input(selector, real_value)
                     actions_taken += 1
                 elif act_type == "click":
                     await self.browser.click_element(selector)
                     actions_taken += 1
-                elif act_type == "select" and value:
-                    await self.browser.page.select_option(selector, value)
+                elif act_type == "select" and real_value:
+                    await self.browser.page.select_option(selector, real_value)
                     actions_taken += 1
                 
                 await emit_automation_step(f"Action: {act_type} on {selector}", "completed")

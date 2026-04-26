@@ -24,15 +24,18 @@ class MatchingAgent(BaseAgent):
         # We can reuse the gap/alignment logic from resume_tailor
         matched, missing = resume_tailor.analyze_alignment(user_skills, job_skills)
         
-        if not job_skills:
-            score = 0.5
-        else:
-            match_ratio = len(matched) / len(job_skills)
-            # Base semantic score (mocked here, but would be fetched via FAISS usually)
-            base_score = 0.6 
-            score = base_score + (match_ratio * 0.4) # Max 1.0
+        match_ratio = len(matched) / len(job_skills) if job_skills else 0.5
+        # Base semantic score (mocked here, but would be fetched via FAISS usually)
+        base_score = 0.6 
+        score = base_score + (match_ratio * 0.4) # Max 1.0
             
         state["match_score"] = score
-        logger.info(f"[Agent: {self.name}] Match score calculated: {score}")
+        state["match_analytics"] = {
+            "matched_skills": list(matched),
+            "missing_skills": list(missing),
+            "alignment_ratio": match_ratio,
+            "recommendation": "Strong Match" if score > 0.8 else "Needs Tailoring"
+        }
+        logger.info(f"[Agent: {self.name}] Match score: {score}. Matched: {len(matched)}, Missing: {len(missing)}")
         
         return state

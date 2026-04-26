@@ -24,6 +24,7 @@ class Job(Base):
     
     # AI Decisioning
     match_score = Column(Float, default=0.0)
+    match_analytics = Column(JSON, default=dict) # New field for detailed gap analysis
     ai_decision = Column(String, default="PENDING") # PENDING, AUTO_APPLY_READY, REVIEW, IGNORE
     
     applications = relationship("Application", back_populates="job")
