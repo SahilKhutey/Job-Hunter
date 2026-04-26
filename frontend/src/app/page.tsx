@@ -78,18 +78,35 @@ function ActivityItem({ icon, title, desc, time }: ActivityEvent) {
 
 // ── PickCard ──────────────────────────────────────────────────────────────────
 
-function PickCard({ id, title, company, location, match_score }: TopPick) {
+function PickCard({ id, title, company, location, match_score, match_analytics }: any) {
   return (
     <Link href={`/jobs`}>
-      <div className="card p-4 flex items-center justify-between hover:border-violet-500/40 transition-all duration-200 cursor-pointer group">
-        <div>
+      <div className="card p-4 flex items-center justify-between hover:border-violet-500/40 transition-all duration-200 cursor-pointer group relative overflow-hidden">
+        <div className="z-10 flex-1">
           <p className="font-semibold text-sm text-white group-hover:text-violet-300 transition-colors">{title}</p>
           <p className="text-xs text-neutral-500 mt-0.5">{company} · {location}</p>
+          
+          {match_analytics?.missing_skills?.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {match_analytics.missing_skills.slice(0, 2).map((s: string) => (
+                <span key={s} className="px-1.5 py-0.5 bg-red-500/10 text-red-400 text-[9px] rounded border border-red-500/20">
+                  {s}
+                </span>
+              ))}
+              {match_analytics.missing_skills.length > 2 && (
+                <span className="text-[9px] text-neutral-600 ml-1">+{match_analytics.missing_skills.length - 2}</span>
+              )}
+            </div>
+          )}
         </div>
-        <div className="text-right">
+        <div className="text-right z-10 shrink-0">
           <p className="text-lg font-bold text-violet-400">{Math.round(match_score * 100)}%</p>
           <span className="badge-auto">Auto Ready</span>
         </div>
+        {/* Glow effect for high match */}
+        {match_score > 0.85 && (
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-violet-500/5 blur-2xl pointer-events-none" />
+        )}
       </div>
     </Link>
   );
@@ -249,6 +266,28 @@ export default function Dashboard() {
           icon="auto_awesome" label="AI Matches" color="amber"
           value={stats?.ai_matches_above_threshold ?? 0} sub={`Above ${profile?.structured_data?.match_threshold ?? 80}% threshold`}
         />
+      </div>
+
+      {/* Phase 6: Discovery Quick-Start */}
+      <div className="bg-neutral-900/40 border border-neutral-800/60 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-violet-500/5 to-transparent pointer-events-none" />
+        <div className="z-10">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span className="material-icons-round text-violet-400">search</span>
+            Discover New Opportunities
+          </h2>
+          <p className="text-xs text-neutral-500 mt-1 max-w-lg">
+            Hunter AI can autonomously scan the web for jobs matching your profile. 
+            Launch a discovery agent to find high-match roles while you sleep.
+          </p>
+        </div>
+        <Link 
+          href="/discovery" 
+          className="z-10 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-500/20 flex items-center gap-2 group-hover:scale-105"
+        >
+          <span className="material-icons-round text-sm">rocket_launch</span>
+          Start Discovery
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

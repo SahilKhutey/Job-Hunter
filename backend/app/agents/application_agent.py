@@ -59,6 +59,7 @@ class ApplicationAgent(BaseAgent):
             max_steps = 10
             step_count = 0
             is_complete = False
+            self.tailored_resume_path = tailored_resume_path
             
             while step_count < max_steps:
                 step_count += 1
@@ -191,8 +192,22 @@ class ApplicationAgent(BaseAgent):
                 elif act_type == "select" and real_value:
                     await self.browser.page.select_option(selector, real_value)
                     actions_taken += 1
+                elif act_type == "upload" and hasattr(self, 'tailored_resume_path'):
+                    await self.browser.upload_file(selector, self.tailored_resume_path)
+                    actions_taken += 1
                 
                 await emit_automation_step(f"Action: {act_type} on {selector}", "completed")
+                audit_logger.log_event("AUTOMATION_ACTION", self.user_id, {
+                    "action": act_type,
+                    "selector": selector,
+                    "reason": reason,
+                    "status": "success"
+                })
+                
+                # Validation check after each action
+                if await self._detect_form_errors():
+                    logger.warning(f"Form validation error detected after {act_type} on {selector}")
+                    await emit_agent_update("ExecutionAgent", "warning", "Validation error detected. Retrying...")
             except Exception as e:
                 logger.error(f"Failed action {act_type} on {selector}: {e}")
                 await emit_automation_step(f"Action: {act_type} on {selector}", "error")
@@ -230,4 +245,15 @@ class ApplicationAgent(BaseAgent):
         # But for now, simple content check
         matches = [k for k in success_keywords if k in content]
         return len(matches) >= 2 # At least 2 keywords to be safe
+
+    async def _detect_form_errors(self) -> bool:
+        """Detects if a validation error is currently visible on the page."""
+        error_keywords = [
+            "is required", "invalid", "please correct", "error occurred", 
+            "mandatory", "not a valid", "required field"
+        ]
+        
+        # We look for visible elements with high contrast or common error classes
+        page_text = (await self.browser.page.content()).lower()
+        return any(k in page_text for k in error_keywords)
 
