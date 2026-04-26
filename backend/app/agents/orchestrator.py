@@ -12,7 +12,7 @@ class Orchestrator:
     def __init__(self, agents: List[BaseAgent]):
         self.agents = agents
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("Starting Multi-Agent Orchestration Pipeline...")
         
         for agent in self.agents:
@@ -24,7 +24,7 @@ class Orchestrator:
                     continue
                     
             try:
-                state = agent.run(state)
+                state = await agent.run(state)
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")
                 state["error"] = str(e)

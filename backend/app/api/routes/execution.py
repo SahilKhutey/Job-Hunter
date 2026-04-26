@@ -9,7 +9,7 @@ from typing import List, Optional
 router = APIRouter()
 
 @router.post("/apply/{job_id}")
-async def apply_to_job(job_id: str, job_url: str, platform: str, profile_id: int, db: Session = Depends(get_db)):
+async def apply_to_job(job_id: str, job_url: str, profile_id: int, resume_path: Optional[str] = None, db: Session = Depends(get_db)):
     """Starts an automated application for a specific job."""
     profile = db.query(Profile).filter(Profile.id == profile_id).first()
     if not profile:
@@ -17,6 +17,7 @@ async def apply_to_job(job_id: str, job_url: str, platform: str, profile_id: int
         
     # Prepare user profile data for automation
     user_profile = {
+        "id": profile.id,
         "full_name": profile.full_name,
         "email": profile.email,
         "phone": profile.phone,
@@ -24,7 +25,15 @@ async def apply_to_job(job_id: str, job_url: str, platform: str, profile_id: int
         "structured_data": profile.structured_data
     }
     
-    await application_engine.start_application(job_id, job_url, platform, user_profile)
+    # If resume_path is not provided, look for the most recent tailored resume in static/resumes
+    if not resume_path:
+        resume_dir = "static/resumes"
+        if os.path.exists(resume_dir):
+            files = [os.path.join(resume_dir, f) for f in os.listdir(resume_dir) if f.startswith(f"tailored_resume_{profile.id}")]
+            if files:
+                resume_path = max(files, key=os.path.getmtime)
+    
+    await application_engine.start_application(job_id, job_url, user_profile, resume_path)
     return {"status": "started", "job_id": job_id}
 
 @router.post("/confirm/{job_id}")

@@ -4,7 +4,7 @@ class BaseAgent:
     def __init__(self, name: str):
         self.name = name
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Takes the current state, performs agent-specific logic, 
         and returns the mutated/updated state.

@@ -8,6 +8,7 @@ openai
 celery
 redis
 playwright
+playwright-stealth
 pydantic
 pydantic-settings
 python-multipart

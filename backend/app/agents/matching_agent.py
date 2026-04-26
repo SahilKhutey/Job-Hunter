@@ -8,7 +8,7 @@ class MatchingAgent(BaseAgent):
     def __init__(self):
         super().__init__("matching")
 
-    def run(self, state: dict) -> dict:
+    async def run(self, state: dict) -> dict:
         logger.info(f"[Agent: {self.name}] Calculating Match Score...")
         
         profile = state.get("profile", {})

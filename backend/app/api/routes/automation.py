@@ -10,8 +10,8 @@ router = APIRouter()
 class ApplicationRequest(BaseModel):
     job_id: str
     job_url: str
-    resume_path: str
     profile_id: int
+    resume_path: Optional[str] = None
 
 
 @router.post("/apply")
@@ -22,6 +22,7 @@ async def start_apply(req: ApplicationRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Profile not found")
     
     user_identity = {
+        "id": profile.id,
         "full_name": profile.full_name,
         "email": profile.email,
         "phone": profile.phone,
@@ -29,12 +30,22 @@ async def start_apply(req: ApplicationRequest, db: Session = Depends(get_db)):
         "skills": profile.skills,
     }
     
+    # Logic to find the latest tailored resume if not provided
+    resume_path = req.resume_path
+    if not resume_path or resume_path == "default_resume.pdf":
+        import os
+        resume_dir = "static/resumes"
+        if os.path.exists(resume_dir):
+            files = [os.path.join(resume_dir, f) for f in os.listdir(resume_dir) if f.startswith(f"tailored_resume_{profile.id}")]
+            if files:
+                resume_path = max(files, key=os.path.getmtime)
+    
     # Start the background application task
     await application_engine.start_application(
         req.job_id,
         req.job_url,
         user_identity,
-        req.resume_path
+        resume_path
     )
 
     

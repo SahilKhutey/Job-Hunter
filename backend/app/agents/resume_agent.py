@@ -8,7 +8,7 @@ class ResumeAgent(BaseAgent):
     def __init__(self):
         super().__init__("resume")
 
-    def run(self, state: dict) -> dict:
+    async def run(self, state: dict) -> dict:
         logger.info(f"[Agent: {self.name}] Tailoring Resume...")
         
         profile = state.get("profile")

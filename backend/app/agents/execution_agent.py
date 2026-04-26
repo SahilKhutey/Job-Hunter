@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 from app.agents.base_agent import BaseAgent
 from app.utils.stealth import apply_stealth, get_random_ua
+from playwright_stealth import Stealth
 import random
 
 class ExecutionAgent(BaseAgent):
@@ -24,7 +25,7 @@ class ExecutionAgent(BaseAgent):
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info(f"[Agent: {self.name}] Browser execution phase.")
         return state
 
@@ -50,8 +51,9 @@ class ExecutionAgent(BaseAgent):
         
         # Apply Stealth Patches
         await apply_stealth(self.page)
+        await Stealth().apply_stealth_async(self.page)
         
-        logger.info(f"ExecutionAgent started for user {self.user_id} with Stealth enabled.")
+        logger.info(f"ExecutionAgent started for user {self.user_id} with Advanced Stealth enabled.")
 
     async def stop(self):
         """Cleanly closes the browser."""
@@ -64,7 +66,15 @@ class ExecutionAgent(BaseAgent):
     async def navigate(self, url: str):
         """Navigates to a URL with anti-detection wait times."""
         await self.page.goto(url, wait_until="networkidle")
-        await asyncio.sleep(random.uniform(1.5, 3.5)) # Randomized human pause
+        await self.wait_for_page_stable()
+
+    async def wait_for_page_stable(self):
+        """Waits for the page to stop moving/loading."""
+        await asyncio.sleep(random.uniform(1.0, 2.0))
+        try:
+            await self.page.wait_for_load_state("networkidle", timeout=5000)
+        except:
+            pass # Continue if networkidle takes too long
 
     async def get_page_content(self) -> str:
         """Returns the inner text of the page for AI analysis."""

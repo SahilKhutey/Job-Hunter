@@ -8,7 +8,7 @@ class JobAgent(BaseAgent):
     def __init__(self):
         super().__init__("job")
 
-    def run(self, state: dict) -> dict:
+    async def run(self, state: dict) -> dict:
         logger.info(f"[Agent: {self.name}] Analyzing Job Description...")
         
         job = state.get("job", {})

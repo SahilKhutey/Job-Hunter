@@ -1,0 +1,5 @@
+{"timestamp": "2026-04-26T04:36:08.525470", "event_type": "APPLICATION_START", "user_id": "test_user_123", "details": {"job_id": 999, "job_url": "http://127.0.0.1:8001/"}}
+{"timestamp": "2026-04-26T04:39:41.485975", "event_type": "APPLICATION_START", "user_id": "test_user_123", "details": {"job_id": 999, "job_url": "http://127.0.0.1:8001/"}}
+{"timestamp": "2026-04-26T04:40:16.678219", "event_type": "APPLICATION_START", "user_id": "test_user_123", "details": {"job_id": 999, "job_url": "http://127.0.0.1:8001/"}}
+{"timestamp": "2026-04-26T04:42:58.442221", "event_type": "APPLICATION_START", "user_id": "test_user_123", "details": {"job_id": 999, "job_url": "http://127.0.0.1:8001/"}}
+{"timestamp": "2026-04-26T04:43:54.221271", "event_type": "APPLICATION_START", "user_id": "test_user_123", "details": {"job_id": 999, "job_url": "http://127.0.0.1:8001/"}}

@@ -124,23 +124,33 @@ QUESTIONS:
 OUTPUT:
 JSON:
 [
-  {"question": "...", "answer": "..."}
+  {{"question": "...", "answer": "..."}}
 ]
 """
 
 MAP_FORM_PROMPT = """
 You are a browser automation expert.
 Map the following browser DOM elements to the user's profile fields.
+
 USER PROFILE:
 {profile}
+
 DOM ELEMENTS:
 {elements}
+
 Return a JSON list of actions:
 [
-  {"selector": "...", "action": "type", "value": "...", "reason": "..."},
-  {"selector": "...", "action": "click", "reason": "..."}
+  {{"selector": "...", "action": "type", "value": "...", "reason": "..."}},
+  {{"selector": "...", "action": "click", "reason": "...", "is_navigation": true/false}},
+  {{"selector": "...", "action": "select", "value": "...", "reason": "..."}}
 ]
-Only map fields that clearly correspond to profile data.
+
+RULES:
+1. Only map 'type' or 'select' fields that clearly correspond to profile data.
+2. If there are multiple navigation buttons (e.g., 'Back', 'Next', 'Continue', 'Submit', 'Apply'), choose the ONE that moves the application FORWARD.
+3. Mark navigation buttons with "is_navigation": true.
+4. If the page contains a "Submit" or "Apply" button and all relevant data entry fields are filled, select it.
+5. If no data entry fields are found, look ONLY for navigation buttons that move forward.
 """
 
 class LLMClient:
@@ -163,7 +173,7 @@ class LLMClient:
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
-            print(f"Error parsing JSON from LLM: {e}")
+            print(f"Error calling LLM: {e}")
             return {}
 
     def _call_text(self, prompt: str, system_msg: str, temperature: float = 0.5) -> str:
