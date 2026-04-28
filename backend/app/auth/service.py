@@ -1,11 +1,15 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.user import User, UserIdentity
 from app.auth.utils import hash_password, verify_password
 from app.auth.jwt_handler import create_access_token, create_refresh_token
 
 
-def register_user(db: Session, email: str, password: str, full_name: str = None):
-    existing = db.query(User).filter(User.email == email).first()
+async def register_user(db: AsyncSession, email: str, password: str, full_name: str = None):
+    stmt = select(User).filter(User.email == email)
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
+    
     if existing:
         raise Exception("User already exists")
 
@@ -16,19 +20,22 @@ def register_user(db: Session, email: str, password: str, full_name: str = None)
     )
 
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     
     # Initialize UserIdentity
     identity = UserIdentity(user_id=user.id, full_name=full_name)
     db.add(identity)
-    db.commit()
+    await db.commit()
 
     return user
 
 
-def authenticate_user(db: Session, email: str, password: str):
-    user = db.query(User).filter(User.email == email).first()
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    stmt = select(User).filter(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
     if not user or not verify_password(password, user.hashed_password):
         return None
     return user

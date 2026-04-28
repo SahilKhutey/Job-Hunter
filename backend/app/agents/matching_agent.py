@@ -1,6 +1,7 @@
 from app.agents.base_agent import BaseAgent
-from app.services.resume_tailor import resume_tailor
+from app.services.matching_service import matching_service
 import logging
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -8,34 +9,30 @@ class MatchingAgent(BaseAgent):
     def __init__(self):
         super().__init__("matching")
 
-    async def run(self, state: dict) -> dict:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Async run for MatchingAgent using the refined MatchingEngine."""
         logger.info(f"[Agent: {self.name}] Calculating Match Score...")
         
         profile = state.get("profile", {})
         job = state.get("job", {})
         
-        user_skills = profile.get("skills", [])
-        job_skills = job.get("skills_required", [])
-        
-        if not user_skills or not job_skills:
-            state["match_score"] = 0.5
+        if not profile or not job:
+            logger.warning("Missing profile or job for matching.")
+            state["match_score"] = 0.0
             return state
 
-        # We can reuse the gap/alignment logic from resume_tailor
-        matched, missing = resume_tailor.analyze_alignment(user_skills, job_skills)
+        # Use the unified matching service
+        metrics = await matching_service.calculate_metrics(profile, job)
         
-        match_ratio = len(matched) / len(job_skills) if job_skills else 0.5
-        # Base semantic score (mocked here, but would be fetched via FAISS usually)
-        base_score = 0.6 
-        score = base_score + (match_ratio * 0.4) # Max 1.0
-            
-        state["match_score"] = score
+        state["match_score"] = metrics["match_score"]
         state["match_analytics"] = {
-            "matched_skills": list(matched),
-            "missing_skills": list(missing),
-            "alignment_ratio": match_ratio,
-            "recommendation": "Strong Match" if score > 0.8 else "Needs Tailoring"
+            "matched_skills": metrics.get("matched_skills", []),
+            "missing_skills": metrics.get("skill_gap", []),
+            "difficulty": metrics.get("difficulty", 0.5),
+            "priority": metrics.get("priority", "MEDIUM"),
+            "recommendation": "Strong Match" if metrics["match_score"] > 0.8 else "Needs Tailoring"
         }
-        logger.info(f"[Agent: {self.name}] Match score: {score}. Matched: {len(matched)}, Missing: {len(missing)}")
+        
+        logger.info(f"[Agent: {self.name}] Match score: {state['match_score']}. Matched: {len(state['match_analytics']['matched_skills'])}")
         
         return state

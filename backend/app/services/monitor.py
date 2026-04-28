@@ -1,7 +1,6 @@
-import time
+import asyncio
 import logging
-import requests
-from threading import Thread
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ResilienceMonitor")
@@ -11,33 +10,47 @@ class ResilienceMonitor:
         self.api_url = api_url
         self.running = False
         self.status = "INITIALIZING"
+        self._task: asyncio.Task = None
 
     def start(self):
+        """Starts the async monitoring loop in the background."""
+        if self._task and not self._task.done():
+            return
+        
         self.running = True
-        self.thread = Thread(target=self._run)
-        self.thread.daemon = True
-        self.thread.start()
-        logger.info("Resilience Monitor Started.")
+        self._task = asyncio.create_task(self._run())
+        logger.info("Resilience Monitor Started (Async).")
 
-    def _run(self):
-        while self.running:
+    async def stop(self):
+        self.running = False
+        if self._task:
+            self._task.cancel()
             try:
-                response = requests.get(self.api_url, timeout=5)
-                health = response.json()
-                
-                if health["status"] == "HEALTHY":
-                    self.status = "OPTIMAL"
-                else:
-                    self.status = "DEGRADED"
-                    self._attempt_recovery(health["details"])
-                    
-            except Exception as e:
-                logger.error(f"Heartbeat Failed: {e}")
-                self.status = "DISCONNECTED"
-            
-            time.sleep(30) # Pulse every 30 seconds
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        logger.info("Resilience Monitor Stopped.")
 
-    def _attempt_recovery(self, details):
+    async def _run(self):
+        async with httpx.AsyncClient() as client:
+            while self.running:
+                try:
+                    response = await client.get(self.api_url, timeout=5)
+                    health = response.json()
+                    
+                    if health["status"] == "HEALTHY":
+                        self.status = "OPTIMAL"
+                    else:
+                        self.status = "DEGRADED"
+                        await self._attempt_recovery(health.get("details", {}))
+                        
+                except Exception as e:
+                    logger.error(f"Heartbeat Failed: {e}")
+                    self.status = "DISCONNECTED"
+                
+                await asyncio.sleep(30) # Pulse every 30 seconds
+
+    async def _attempt_recovery(self, details):
         logger.warning(f"Attempting recovery for degraded sub-systems: {details}")
         
         if details.get("browser_engine") == "offline":

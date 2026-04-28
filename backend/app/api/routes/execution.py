@@ -5,12 +5,13 @@ from app.core.database import get_db
 from app.models.profile import Profile
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
 
 router = APIRouter()
 
 @router.post("/apply/{job_id}")
 async def apply_to_job(job_id: str, job_url: str, profile_id: int, resume_path: Optional[str] = None, db: Session = Depends(get_db)):
-    """Starts an automated application for a specific job."""
+    """Starts an automated application for a specific job (Async)."""
     profile = db.query(Profile).filter(Profile.id == profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -38,12 +39,13 @@ async def apply_to_job(job_id: str, job_url: str, profile_id: int, resume_path: 
 
 @router.post("/confirm/{job_id}")
 async def confirm_application(job_id: str):
-    """Confirm a paused application submission."""
+    """Confirm a paused application submission (Async)."""
     success = await automation_service.confirm_application(job_id)
     if not success:
         raise HTTPException(status_code=404, detail="No pending confirmation found for this job.")
     return {"status": "confirmed", "job_id": job_id}
 
 @router.get("/status/{job_id}")
-def get_application_status(job_id: str):
+async def get_application_status(job_id: str):
+    """Returns the current status of an ongoing application (Async)."""
     return {"job_id": job_id, "status": application_engine.get_status(job_id)}

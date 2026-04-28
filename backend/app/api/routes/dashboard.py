@@ -1,33 +1,44 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.models.job import Job, Application
 from app.models.profile import Profile
-from typing import Optional
+from typing import Optional, List
+from app.services.analytics_service import analytics_service
 
 router = APIRouter()
 
-
-from app.services.analytics_service import analytics_service
-
 @router.get("/stats")
-def dashboard_stats(
+async def dashboard_stats(
     profile_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    """Return real application statistics for the dashboard."""
-    total_jobs = db.query(Job).count()
-    applications = db.query(Application).all()
+    """Return real application statistics for the dashboard (Async)."""
+    # 1. All Jobs (for risk analysis)
+    jobs_result = await db.execute(select(Job))
+    jobs = jobs_result.scalars().all()
+    total_jobs = len(jobs)
+
+    # 2. All Applications
+    apps_result = await db.execute(select(Application))
+    applications = apps_result.scalars().all()
     
-    # Compute base stats
-    base_stats = analytics_service.compute_dashboard_stats(applications)
+    # Compute base stats via service
+    base_stats = analytics_service.compute_dashboard_stats(applications, jobs)
     resume_perf = analytics_service.analyze_resume_performance(applications)
     platform_perf = analytics_service.analyze_platform_performance(applications)
-    ai_insights = analytics_service.generate_ai_insights(base_stats, resume_perf, platform_perf)
+    score_corr = analytics_service.analyze_score_correlation(applications)
+    
+    ai_insights = analytics_service.generate_ai_insights(base_stats, resume_perf, platform_perf, score_corr)
 
-    # AI matches
-    auto_ready = db.query(Job).filter(Job.ai_decision == "AUTO_APPLY_READY").count()
-    review = db.query(Job).filter(Job.ai_decision == "REVIEW").count()
+    # 3. AI Matches (Filtered)
+    auto_ready_result = await db.execute(select(func.count(Job.id)).filter(Job.ai_decision == "AUTO_APPLY_READY"))
+    auto_ready = auto_ready_result.scalar() or 0
+    
+    review_result = await db.execute(select(func.count(Job.id)).filter(Job.ai_decision == "REVIEW"))
+    review = review_result.scalar() or 0
 
     return {
         "total_jobs_analyzed": total_jobs,
@@ -36,33 +47,38 @@ def dashboard_stats(
         "interviews": sum(1 for a in applications if a.status == "interview"),
         "offers": sum(1 for a in applications if a.status == "offer"),
         "ai_matches_above_threshold": auto_ready + review,
-        "response_rate": base_stats["interview_rate"], # For backward compatibility in UI
+        "risks_avoided": base_stats.get("risks_avoided", 0),
+        "response_rate": base_stats["interview_rate"],
         "interview_rate": base_stats["interview_rate"],
         "status_breakdown": base_stats["status_breakdown"],
         "ai_insights": ai_insights,
         "resume_performance": resume_perf,
-        "platform_performance": platform_perf
+        "platform_performance": platform_perf,
+        "score_correlation": score_corr
     }
 
-
 @router.get("/activity")
-def dashboard_activity(
+async def dashboard_activity(
     profile_id: Optional[int] = Query(None),
     limit: int = Query(10),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    """Return recent activity events."""
+    """Return recent activity events (Async)."""
     # Get recent applications ordered by applied_at
-    recent_apps = (
-        db.query(Application)
-        .join(Job, Application.job_id == Job.id)
-        .order_by(Application.applied_at.desc())
+    # We join with Job to get company/title
+    stmt = (
+        select(Application)
+        .options(selectinload(Application.job))
+        .order_by(desc(Application.applied_at))
         .limit(limit)
-        .all()
     )
+    result = await db.execute(stmt)
+    recent_apps = result.scalars().all()
 
     events = []
     for app in recent_apps:
+        # Load job relationship if not already loaded (eager loading preferred)
+        # For simplicity in this session, we assume join+select worked
         events.append({
             "type": "application",
             "icon": "send",
@@ -72,14 +88,16 @@ def dashboard_activity(
         })
 
     # Get recent high-score jobs (new matches)
-    new_matches = (
-        db.query(Job)
+    match_stmt = (
+        select(Job)
         .filter(Job.match_score >= 0.80)
         .filter(Job.ai_decision == "AUTO_APPLY_READY")
-        .order_by(Job.posted_at.desc())
+        .order_by(desc(Job.posted_at))
         .limit(5)
-        .all()
     )
+    match_result = await db.execute(match_stmt)
+    new_matches = match_result.scalars().all()
+
     for job in new_matches:
         events.append({
             "type": "match",
@@ -93,21 +111,22 @@ def dashboard_activity(
     events.sort(key=lambda e: e["time"], reverse=True)
     return events[:limit]
 
-
 @router.get("/top-picks")
-def top_picks(
+async def top_picks(
     profile_id: Optional[int] = Query(None),
     limit: int = Query(5),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    """Return the top jobs by match score for the dashboard picks widget."""
-    jobs = (
-        db.query(Job)
+    """Return the top jobs by match score for the dashboard picks widget (Async)."""
+    stmt = (
+        select(Job)
         .filter(Job.match_score > 0)
-        .order_by(Job.match_score.desc())
+        .order_by(desc(Job.match_score))
         .limit(limit)
-        .all()
     )
+    result = await db.execute(stmt)
+    jobs = result.scalars().all()
+
     return [
         {
             "id": j.id,

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
 from app.services.resume_parser import extract_resume_text
 
@@ -46,11 +47,13 @@ class ProfileUpdate(BaseModel):
 # ── Create profile (manual, no resume required) ───────────────────────────────
 
 @router.post("/create")
-def create_profile(data: ProfileCreate, db: Session = Depends(get_db)):
-    """Create a new user profile from the onboarding wizard."""
-    existing = db.query(Profile).filter(Profile.email == data.email).first()
+async def create_profile(data: ProfileCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new user profile from the onboarding wizard (Async)."""
+    stmt = select(Profile).filter(Profile.email == data.email)
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
+    
     if existing:
-        # Return the existing profile instead of raising an error
         return {"status": "existing", "profile": _serialize(existing)}
 
     profile = Profile(
@@ -77,28 +80,28 @@ def create_profile(data: ProfileCreate, db: Session = Depends(get_db)):
         }
     )
     db.add(profile)
-    db.commit()
-    db.refresh(profile)
+    await db.commit()
+    await db.refresh(profile)
     return {"status": "created", "profile": _serialize(profile)}
 
-
-# ── Get profile ───────────────────────────────────────────────────────────────
-
 @router.get("/{profile_id}")
-def get_profile(profile_id: int, db: Session = Depends(get_db)):
-    """Retrieve a profile by ID."""
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
+async def get_profile(profile_id: int, db: AsyncSession = Depends(get_db)):
+    """Retrieve a profile by ID (Async)."""
+    stmt = select(Profile).filter(Profile.id == profile_id)
+    result = await db.execute(stmt)
+    profile = result.scalar_one_or_none()
+    
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return _serialize(profile)
 
-
-# ── Update profile ────────────────────────────────────────────────────────────
-
 @router.put("/{profile_id}")
-def update_profile(profile_id: int, data: ProfileUpdate, db: Session = Depends(get_db)):
-    """Update a profile's fields."""
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
+async def update_profile(profile_id: int, data: ProfileUpdate, db: AsyncSession = Depends(get_db)):
+    """Update a profile's fields (Async)."""
+    stmt = select(Profile).filter(Profile.id == profile_id)
+    result = await db.execute(stmt)
+    profile = result.scalar_one_or_none()
+    
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
@@ -125,32 +128,31 @@ def update_profile(profile_id: int, data: ProfileUpdate, db: Session = Depends(g
     if data.portfolio_url is not None: links["portfolio"] = data.portfolio_url
     profile.links = links
 
-    db.commit()
-    db.refresh(profile)
+    await db.commit()
+    await db.refresh(profile)
     return {"status": "updated", "profile": _serialize(profile)}
-
-
-# ── Extract from resume (upload) ──────────────────────────────────────────────
 
 @router.post("/{profile_id}/upload-resume")
 async def upload_resume(
     profile_id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    """Upload a resume PDF/DOCX and extract intelligence, then update the profile."""
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
+    """Upload a resume PDF/DOCX and extract intelligence (Async)."""
+    stmt = select(Profile).filter(Profile.id == profile_id)
+    result = await db.execute(stmt)
+    profile = result.scalar_one_or_none()
+    
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     content = await file.read()
-    text = extract_resume_text(file.filename or "resume.pdf", content)
+    text = await extract_resume_text(file.filename or "resume.pdf", content)
     if not text:
-
         raise HTTPException(status_code=400, detail="Could not extract text from file.")
 
     # Extract structured data via LLM
-    extracted = llm_client.extract_profile_data(text)
+    extracted = await llm_client.extract_profile_data(text)
 
     # Merge extracted into profile
     profile.raw_resume_text = text
@@ -168,10 +170,10 @@ async def upload_resume(
     if not profile.phone and extracted.get("phone"):
         profile.phone = extracted["phone"]
 
-    github_username = (profile.structured_data or {}).get("github_username")
+    github_username = sd.get("github_username")
     github_data = []
     if github_username:
-        github_data = intelligence_engine.fetch_github(github_username)
+        github_data = await intelligence_engine.fetch_github(github_username)
 
     final = intelligence_engine.merge_profiles(
         resume_data=extracted,
@@ -181,8 +183,8 @@ async def upload_resume(
     profile.structured_data = {**(profile.structured_data or {}), **final}
     profile.skills = final.get("skills", profile.skills or [])
 
-    db.commit()
-    db.refresh(profile)
+    await db.commit()
+    await db.refresh(profile)
     return {"status": "extracted", "profile": _serialize(profile)}
 
 
@@ -216,4 +218,3 @@ def _serialize(profile: Profile) -> dict:
         "skill_graph": profile.skill_graph or {},
         "has_resume": bool(profile.raw_resume_text),
     }
-

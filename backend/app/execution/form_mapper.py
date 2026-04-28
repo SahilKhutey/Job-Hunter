@@ -1,7 +1,7 @@
 from app.ai.llm_client import llm_client
 
 def map_field(label: str, profile: dict) -> str:
-    """Smart field mapping logic."""
+    """Smart field mapping logic (Sync for speed on simple cases)."""
     if not label:
         return ""
         
@@ -31,8 +31,8 @@ def map_field(label: str, profile: dict) -> str:
 
     return ""
 
-def map_field_llm(label: str, profile: dict) -> str:
-    """Fallback LLM mapping for complex fields."""
+async def map_field_llm(label: str, profile: dict) -> str:
+    """Fallback LLM mapping for complex fields (Async)."""
     prompt = f"""
     Map this form field to the best piece of user data.
     If you don't know, return an empty string. Only return the final text to input.
@@ -40,8 +40,8 @@ def map_field_llm(label: str, profile: dict) -> str:
     Field: {label}
     Profile: {profile}
     """
-    # Assuming we added a raw completion method, or using existing text call
     try:
-        return llm_client._call_text(prompt, "You are an intelligent form filler.", temperature=0.0)
-    except:
+        # call_text is async
+        return await llm_client._call_text(prompt, "You are an intelligent form filler.", temperature=0.0)
+    except Exception:
         return ""

@@ -1,6 +1,7 @@
 from app.agents.base_agent import BaseAgent
 from app.ai.llm_client import llm_client
 import logging
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +9,8 @@ class JobAgent(BaseAgent):
     def __init__(self):
         super().__init__("job")
 
-    async def run(self, state: dict) -> dict:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Async run for JobAgent with awaited LLM call."""
         logger.info(f"[Agent: {self.name}] Analyzing Job Description...")
         
         job = state.get("job", {})
@@ -18,9 +20,9 @@ class JobAgent(BaseAgent):
 
         # If it's already analyzed, skip
         if not job.get("skills_required"):
-            analysis = llm_client.analyze_job(job["description"])
+            # Await the async LLM call
+            analysis = await llm_client.analyze_job(job["description"])
             
-            # Merge the analysis back into the job dictionary
             for k, v in analysis.items():
                 job[k] = v
                 

@@ -1,14 +1,14 @@
 class BaseAdapter:
-    """Interface for Site Application Adapters."""
+    """Interface for Site Application Adapters (Async)."""
     
-    def open_job(self, page, job: dict):
+    async def open_job(self, page, job: dict):
         raise NotImplementedError
 
-    def click_apply(self, page):
+    async def click_apply(self, page):
         raise NotImplementedError
 
-    def fill_form(self, page, user_profile: dict):
+    async def fill_form(self, page, user_profile: dict):
         raise NotImplementedError
 
-    def submit(self, page):
+    async def submit(self, page):
         raise NotImplementedError

@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.config import settings
 from typing import Dict, Any, List
 import json
@@ -24,17 +24,21 @@ Resume:
 """
 
 JOB_ANALYST_PROMPT = """
-Analyze the following job description and extract key structured data.
+Analyze the following job description and extract key structured data with elite recruitment intelligence.
 Return JSON with:
 - title
 - company
-- skills_required (list)
+- skills_required (list of strings)
 - experience_required (string)
-- location (string or "Remote")
+- location (string)
 - type (string)
 - key_responsibilities (list)
 - seniority_level (string)
-- tone (string e.g. "startup", "corporate")
+- tone (string)
+- red_flags (list of potential concerns: e.g., "Generic Description", "Excessive Requirements", "Toxic Phrases")
+- strategic_risk_score (0-100, where 100 is high risk of ghost posting or poor fit)
+- priority_index (HIGH/MEDIUM/LOW based on role impact)
+
 Job Description:
 {job_description}
 """
@@ -124,7 +128,7 @@ QUESTIONS:
 OUTPUT:
 JSON:
 [
-  {{"question": "...", "answer": "..."}}
+  {"question": "...", "answer": "..."}
 ]
 """
 
@@ -140,9 +144,9 @@ DOM ELEMENTS:
 
 Return a JSON list of actions:
 [
-  {{"selector": "...", "action": "type", "value": "...", "reason": "..."}},
-  {{"selector": "...", "action": "click", "reason": "...", "is_navigation": true/false}},
-  {{"selector": "...", "action": "select", "value": "...", "reason": "..."}}
+  {"selector": "...", "action": "type", "value": "...", "reason": "..."},
+  {"selector": "...", "action": "click", "reason": "...", "is_navigation": true/false},
+  {"selector": "...", "action": "select", "value": "...", "reason": "..."}
 ]
 
 RULES:
@@ -155,14 +159,13 @@ RULES:
 
 class LLMClient:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-    def _call_json(self, prompt: str, system_msg: str) -> Dict[str, Any]:
+    async def _call_json(self, prompt: str, system_msg: str) -> Dict[str, Any]:
         try:
-            # Privacy Shield: Redact PII before sending to external LLM
             clean_prompt = privacy_shield.mask_pii(prompt)
             
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 response_format={ "type": "json_object" },
                 messages=[
@@ -176,12 +179,11 @@ class LLMClient:
             print(f"Error calling LLM: {e}")
             return {}
 
-    def _call_text(self, prompt: str, system_msg: str, temperature: float = 0.5) -> str:
+    async def _call_text(self, prompt: str, system_msg: str, temperature: float = 0.5) -> str:
         try:
-            # Privacy Shield: Redact PII before sending to external LLM
             clean_prompt = privacy_shield.mask_pii(prompt)
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=[
                     {"role": "system", "content": system_msg},
@@ -194,9 +196,26 @@ class LLMClient:
             print(f"Error from LLM text generation: {e}")
             return ""
 
-    def get_embedding(self, text: str) -> List[float]:
+    async def chat_completion(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
+        """General purpose chat completion (Async)."""
         try:
-            response = self.client.embeddings.create(
+            response = await self.client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=messages,
+                temperature=temperature
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error in chat_completion: {e}")
+            return ""
+
+    async def generate_text(self, prompt: str, system_prompt: str = "You are a helpful assistant.", temperature: float = 0.5) -> str:
+        """Public method for text generation (Async)."""
+        return await self._call_text(prompt, system_prompt, temperature)
+
+    async def get_embedding(self, text: str) -> List[float]:
+        try:
+            response = await self.client.embeddings.create(
                 model="text-embedding-3-small",
                 input=text
             )
@@ -205,44 +224,38 @@ class LLMClient:
             print(f"Error generating embedding: {e}")
             return []
 
-    # Existing methods
+    async def extract_profile_data(self, resume_text: str) -> Dict[str, Any]:
+        return await self._call_json(EXTRACTION_PROMPT.format(resume_text=resume_text), "You are an expert data extraction tool. Always return valid JSON.")
 
-    def extract_profile_data(self, resume_text: str) -> Dict[str, Any]:
-        return self._call_json(EXTRACTION_PROMPT.format(resume_text=resume_text), "You are an expert data extraction tool. Always return valid JSON.")
+    async def analyze_job(self, job_description: str) -> Dict[str, Any]:
+        return await self._call_json(JOB_ANALYST_PROMPT.format(job_description=job_description), "You are an expert Job Analyst Agent. Always return valid JSON.")
 
-    def analyze_job(self, job_description: str) -> Dict[str, Any]:
-        return self._call_json(JOB_ANALYST_PROMPT.format(job_description=job_description), "You are an expert Job Analyst Agent. Always return valid JSON.")
+    async def rewrite_resume(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._call_json(RESUME_REWRITE_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job)), "You are an expert resume optimizer. Always return valid JSON.")
 
-    # Resume Engine methods
-    def rewrite_resume(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
-        return self._call_json(RESUME_REWRITE_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job)), "You are an expert resume optimizer. Always return valid JSON.")
+    async def enhance_bullet(self, bullet: str) -> str:
+        return await self._call_text(BULLET_ENHANCE_PROMPT.format(bullet=bullet), "You are a professional resume writer.", temperature=0.7)
 
-    def enhance_bullet(self, bullet: str) -> str:
-        return self._call_text(BULLET_ENHANCE_PROMPT.format(bullet=bullet), "You are a professional resume writer.", temperature=0.7)
+    async def extract_company_context(self, text: str) -> Dict[str, Any]:
+        return await self._call_json(COMPANY_CONTEXT_PROMPT.format(text=text), "You are a company intelligence analyst. Always return valid JSON.")
 
-    # Application Generator methods
-    def extract_company_context(self, text: str) -> Dict[str, Any]:
-        return self._call_json(COMPANY_CONTEXT_PROMPT.format(text=text), "You are a company intelligence analyst. Always return valid JSON.")
+    async def generate_positioning(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._call_json(POSITIONING_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job)), "You are a strategic career advisor. Always return valid JSON.")
 
-    def generate_positioning(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
-        return self._call_json(POSITIONING_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job)), "You are a strategic career advisor. Always return valid JSON.")
-
-    def generate_cover_letter(self, profile: Dict[str, Any], job: Dict[str, Any], positioning: Dict[str, Any] = None) -> str:
-        # Backward compatibility for older code without positioning
+    async def generate_cover_letter(self, profile: Dict[str, Any], job: Dict[str, Any], positioning: Dict[str, Any] = None) -> str:
         pos = json.dumps(positioning) if positioning else "N/A"
-        return self._call_text(COVER_LETTER_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job), positioning=pos), "You are an elite career consultant.", temperature=0.7)
+        return await self._call_text(COVER_LETTER_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job), positioning=pos), "You are an elite career consultant.", temperature=0.7)
 
-    def generate_form_answers(self, profile: Dict[str, Any], job: Dict[str, Any], questions: List[str]) -> List[Dict[str, str]]:
-        res = self._call_json(FORM_ANSWER_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job), questions=json.dumps(questions)), "You are an expert job application assistant. Always return valid JSON.")
-        # Sometimes the LLM nests the array under a key like "answers"
+    async def generate_form_answers(self, profile: Dict[str, Any], job: Dict[str, Any], questions: List[str]) -> List[Dict[str, str]]:
+        res = await self._call_json(FORM_ANSWER_PROMPT.format(profile=json.dumps(profile), job=json.dumps(job), questions=json.dumps(questions)), "You are an expert job application assistant. Always return valid JSON.")
         if isinstance(res, dict):
             for k, v in res.items():
                 if isinstance(v, list):
                     return v
         return []
 
-    def map_form_fields(self, profile: Dict[str, Any], elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        res = self._call_json(MAP_FORM_PROMPT.format(profile=json.dumps(profile), elements=json.dumps(elements)), "You are a form automation expert. Always return valid JSON.")
+    async def map_form_fields(self, profile: Dict[str, Any], elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        res = await self._call_json(MAP_FORM_PROMPT.format(profile=json.dumps(profile), elements=json.dumps(elements)), "You are a form automation expert. Always return valid JSON.")
         if isinstance(res, list):
             return res
         if isinstance(res, dict):

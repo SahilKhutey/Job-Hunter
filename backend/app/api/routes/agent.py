@@ -7,18 +7,27 @@ from app.models.profile import Profile
 from app.models.job import Job
 from app.agents.run_pipeline import run_application_pipeline
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 router = APIRouter()
 
 @router.post("/run-pipeline")
-def trigger_agent_pipeline(user_id: int, job_id: int, db: Session = Depends(get_db)):
+async def trigger_agent_pipeline(user_id: int, job_id: int, db: AsyncSession = Depends(get_db)):
     """
-    Triggers the Multi-Agent Orchestration Pipeline for a specific user and job.
+    Triggers the Multi-Agent Orchestration Pipeline for a specific user and job (Async).
     """
-    user = db.query(Profile).filter(Profile.id == user_id).first()
+    u_stmt = select(Profile).filter(Profile.id == user_id)
+    u_result = await db.execute(u_stmt)
+    user = u_result.scalar_one_or_none()
+    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    job = db.query(Job).filter(Job.id == job_id).first()
+    j_stmt = select(Job).filter(Job.id == job_id)
+    j_result = await db.execute(j_stmt)
+    job = j_result.scalar_one_or_none()
+    
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -37,15 +46,14 @@ def trigger_agent_pipeline(user_id: int, job_id: int, db: Session = Depends(get_
     }
 
     try:
-        # In a real async environment, this would be pushed to Celery.
-        # For the API response, we run it synchronously here to return the state.
-        final_state = run_application_pipeline(profile_dict, job_dict)
+        # Await the async pipeline
+        final_state = await run_application_pipeline(profile_dict, job_dict)
         
         # Update Job DB based on execution agent's decision
         if "action_decision" in final_state:
             job.ai_decision = final_state["action_decision"]
             job.match_score = final_state.get("match_score", 0.0)
-            db.commit()
+            await db.commit()
             
         return {"status": "success", "state": final_state}
     except Exception as e:
@@ -58,12 +66,11 @@ class AgentCommand(BaseModel):
 @router.post("/command")
 async def process_agent_command(
     cmd: AgentCommand, 
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Processes a natural language command from the Assistant UI.
     """
-    # For now, return a generic acknowledgment or trigger a specific logic
     text = cmd.command.lower()
     
     if "apply" in text:
@@ -76,4 +83,3 @@ async def process_agent_command(
         return {"response": "Opening Profile Studio. I can help you tailor specific sections or regenerate your summary based on your experience."}
         
     return {"response": "Got it. I'm on it. I'll coordinate with the other agents to get that handled."}
-

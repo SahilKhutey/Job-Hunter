@@ -13,6 +13,15 @@ class User(Base):
     provider = Column(String, nullable=True)  # google / linkedin
     provider_id = Column(String, nullable=True)
     extension_token = Column(String, unique=True, index=True, nullable=True)
+    
+    # Strategic Settings & Privacy
+    settings = Column(JSON, default={
+        "anonymize_ai": True,
+        "risk_aware_automation": True,
+        "hallucination_protection": True,
+        "negotiation_risk_premium": True,
+        "telemetry_enabled": False
+    })
 
     
     # Relationships
@@ -25,7 +34,7 @@ class UserIdentity(Base):
     __tablename__ = "user_identities"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
     full_name = Column(String)
     emails = Column(JSON) # List of emails
     phone = Column(String)

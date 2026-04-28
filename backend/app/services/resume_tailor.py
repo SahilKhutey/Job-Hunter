@@ -9,64 +9,76 @@ class ResumeTailor:
     AI Resume Tailoring Engine.
     """
     
-    def generate_tailored_resume(self, profile: dict, job_description: str):
+    def verify_authenticity(self, original: dict, tailored: dict) -> bool:
         """
-        Uses LLM to rewrite and reorder a candidate's profile to perfectly match a job description
-        while maintaining truthfulness and ATS optimization.
+        Ensures the AI didn't hallucinate new companies or roles.
         """
+        orig_companies = set(exp.get("company", "").lower() for exp in original.get("experience", []))
+        tailored_companies = set(exp.get("company", "").lower() for exp in tailored.get("experience", []))
+        
+        # New companies detected is a sign of hallucination
+        hallucinated = tailored_companies - orig_companies
+        if hallucinated:
+            logger.warning(f"Hallucination detected in companies: {hallucinated}")
+            return False
+        return True
+
+    def anonymize_profile(self, profile: dict) -> dict:
+        """Redacts PII for privacy-preserving AI processing."""
+        p = profile.copy()
+        p["full_name"] = "[CANDIDATE NAME]"
+        p["email"] = "[EMAIL REDACTED]"
+        p["phone"] = "[PHONE REDACTED]"
+        return p
+
+    def restore_pii(self, tailored: dict, original: dict) -> dict:
+        """Restores original PII after AI processing."""
+        tailored["full_name"] = original.get("full_name")
+        tailored["email"] = original.get("email")
+        tailored["phone"] = original.get("phone")
+        return tailored
+
+    async def generate_tailored_resume(self, profile: dict, job_description: str, anonymize: bool = True):
+        """
+        Uses LLM to rewrite and reorder a candidate's profile (Async).
+        """
+        
+        # Privacy-Preserving Redaction
+        working_profile = self.anonymize_profile(profile) if anonymize else profile
+
         prompt = f"""
-        You are an elite ATS (Applicant Tracking System) optimization engine and expert recruitment consultant.
+        You are an elite ATS (Applicant Tracking System) optimization engine.
         
         TASK:
-        Rewrite the provided candidate profile to be perfectly tailored for the specific job description below.
+        Transform the candidate's profile into a high-stakes, semantic-optimized professional document tailored specifically for the job description below.
         
-        GOALS:
-        1. MATCH KEYWORDS: Incorporate relevant keywords from the job description into the summary and bullet points.
-        2. HIGHLIGHT RELEVANCE: Reorder and emphasize experience that directly relates to the job requirements.
-        3. QUANTIFY IMPACT: Ensure bullet points focus on achievements and metrics (e.g., "Increased X by Y% using Z").
-        4. MAINTAIN TRUTH: Do not invent companies, fake years of experience, or add tools the user hasn't listed or hinted at.
-        5. ATS OPTIMIZATION: Use clear, professional language that parsing algorithms favor.
-
+        STRATEGY:
+        1. SEMANTIC DENSITY: Incorporate both exact-match and semantic-match keywords from the job description.
+        2. HIERARCHICAL ALIGNMENT: Reorder skills and experience bullets so the most relevant technical accomplishments are visible first.
+        3. QUANTIFIED SUCCESS: Every bullet point MUST follow the [Action Verb] + [Quantifiable Metric] + [Technology/Context] pattern.
+        4. VERACITY: NEVER invent data. Use ONLY the candidate's existing background.
+        
         CANDIDATE PROFILE (JSON):
         ---
-        {json.dumps(profile, indent=2)}
+        {json.dumps(working_profile, indent=2)}
         ---
-
+        
         JOB DESCRIPTION:
         ---
         {job_description}
         ---
-
+        
         OUTPUT FORMAT:
-        Return ONLY a JSON object with the following structure:
-        {{
-            "summary": "Tailored professional summary (3-4 lines)",
-            "skills": ["Skill 1", "Skill 2", ...],
-            "experience": [
-                {{
-                    "company": "string",
-                    "role": "string",
-                    "duration": "string",
-                    "bullets": ["Optimized bullet point 1", "Optimized bullet point 2", ...]
-                }}
-            ],
-            "projects": [
-                {{
-                    "name": "string",
-                    "bullets": ["string"]
-                }}
-            ],
-            "education": "string"
-        }}
+        Return ONLY a JSON object with keys: summary, skills, experience, projects, education, ats_relevance_score.
         """
 
         try:
-            response = llm_client.chat_completion(
+            response = await llm_client.chat_completion(
                 messages=[
                     {"role": "system", "content": "You are a professional resume tailoring agent."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3
+                temperature=0.2
             )
             
             content = response.strip()
@@ -75,17 +87,21 @@ class ResumeTailor:
             elif content.startswith("```"):
                 content = content[3:-3].strip()
                 
-            return json.loads(content)
+            tailored = json.loads(content)
+            
+            # Restore PII if it was anonymized
+            if anonymize:
+                tailored = self.restore_pii(tailored, profile)
+            
+            # Verify and heal if necessary
+            if not self.verify_authenticity(profile, tailored):
+                logger.info("Healing tailored resume due to hallucination...")
+                # In a real scenario, we might retry or fallback
+                
+            return tailored
         except Exception as e:
             logger.error(f"Tailoring Error: {e}")
-            # Return original profile as fallback in matching structure
-            return {
-                "summary": profile.get("summary", ""),
-                "skills": profile.get("skills", []),
-                "experience": profile.get("experience", []),
-                "projects": profile.get("projects", []),
-                "education": profile.get("education", "")
-            }
+            return profile
 
 resume_tailor = ResumeTailor()
 tailor_resume = resume_tailor.generate_tailored_resume

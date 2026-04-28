@@ -134,6 +134,19 @@ export default function SettingsPage() {
     }
   }, [profile]);
 
+  const handleSettingChange = async (key: string, value: any) => {
+    if (!profileId || !profile) return;
+    const newSettings = { ...(profile.settings || {}), [key]: value };
+    try {
+      const result = await updateProfile(profileId, { settings: newSettings });
+      setProfile(result);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError("Failed to update setting");
+    }
+  };
+
   const handleSave = async () => {
     if (!profileId) return;
     setSaving(true);
@@ -150,8 +163,10 @@ export default function SettingsPage() {
         linkedin_url: linkedin,
         portfolio_url: portfolio,
         match_threshold: threshold,
+        // Preserve current settings
+        settings: profile?.settings
       });
-      setProfile(result.profile);
+      setProfile(result);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
@@ -244,10 +259,41 @@ export default function SettingsPage() {
           <>
             <SectionHeader icon="lock" title="Security & Privacy" desc="Manage how credentials and sessions are stored." />
             <div className="mb-6 space-y-1">
+              <Toggle 
+                label="Privacy-Preserving AI Interfacing" 
+                sub="Automatically anonymize PII before sending to LLM agents" 
+                checked={profile?.settings?.anonymize_ai ?? true} 
+                onChange={() => handleSettingChange("anonymize_ai", !(profile?.settings?.anonymize_ai ?? true))} 
+              />
               <Toggle label="Encrypted Credential Vault" sub="Credentials stored using AES-256 Fernet encryption" checked={vaultEnabled} onChange={() => setVaultEnabled(!vaultEnabled)} />
               <Toggle label="Session Reuse" sub="Reuse authenticated browser contexts to avoid repeated logins" checked={sessionReuse} onChange={() => setSessionReuse(!sessionReuse)} />
               <Toggle label="Human-in-the-Loop" sub="Always pause and notify you before final form submission" checked={humanLoop} onChange={() => setHumanLoop(!humanLoop)} />
             </div>
+            
+            <div className="mb-6">
+               <SectionHeader icon="security" title="Strategic Intelligence Guard" desc="Control risk-aware automation and veracity checks." />
+               <div className="space-y-1">
+                  <Toggle 
+                    label="Hallucination Protection" 
+                    sub="Verify AI-generated content against your source identity" 
+                    checked={profile?.settings?.hallucination_protection ?? true} 
+                    onChange={() => handleSettingChange("hallucination_protection", !(profile?.settings?.hallucination_protection ?? true))} 
+                  />
+                  <Toggle 
+                    label="Risk-Aware Automation" 
+                    sub="Automatically adjust strategy based on detected job red flags" 
+                    checked={profile?.settings?.risk_aware_automation ?? true} 
+                    onChange={() => handleSettingChange("risk_aware_automation", !(profile?.settings?.risk_aware_automation ?? true))} 
+                  />
+                  <Toggle 
+                    label="Negotiation Risk Premium" 
+                    sub="Recommend higher compensation for high-stakes roles" 
+                    checked={profile?.settings?.negotiation_risk_premium ?? true} 
+                    onChange={() => handleSettingChange("negotiation_risk_premium", !(profile?.settings?.negotiation_risk_premium ?? true))} 
+                  />
+               </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-400">OpenAI API Key</label>
               <div className="flex gap-2">

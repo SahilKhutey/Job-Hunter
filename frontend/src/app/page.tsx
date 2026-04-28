@@ -24,6 +24,7 @@ function StatsCard({ icon, label, value, sub, color = "violet", loading }: {
     emerald: "text-emerald-400 bg-emerald-500/10",
     amber: "text-amber-400 bg-amber-500/10",
     sky: "text-sky-400 bg-sky-500/10",
+    rose: "text-rose-400 bg-rose-500/10",
   };
   if (loading) {
     return (
@@ -36,11 +37,11 @@ function StatsCard({ icon, label, value, sub, color = "violet", loading }: {
     );
   }
   return (
-    <div className="stat-card animate-slide-up">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colors[color]}`}>
+    <div className="stat-card animate-slide-up group hover:border-neutral-700/80 transition-all duration-300 cursor-default">
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${colors[color]}`}>
         <span className="material-icons-round text-[18px]">{icon}</span>
       </div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-2xl font-bold mt-1 group-hover:text-white transition-colors">{value}</p>
       <p className="text-xs font-medium text-neutral-400">{label}</p>
       <p className="text-[10px] text-neutral-600">{sub}</p>
     </div>
@@ -49,7 +50,7 @@ function StatsCard({ icon, label, value, sub, color = "violet", loading }: {
 
 // ── ActivityItem ──────────────────────────────────────────────────────────────
 
-function ActivityItem({ icon, title, desc, time }: ActivityEvent) {
+function ActivityItem({ icon, title, desc, time, color = "violet" }: ActivityEvent & { color?: string }) {
   const since = time
     ? (() => {
         const diff = Date.now() - new Date(time).getTime();
@@ -62,13 +63,20 @@ function ActivityItem({ icon, title, desc, time }: ActivityEvent) {
       })()
     : "";
 
+  const colors: Record<string, string> = {
+    violet: "text-violet-400 bg-white/5",
+    emerald: "text-emerald-400 bg-emerald-500/10",
+    rose: "text-rose-400 bg-rose-500/10",
+    amber: "text-amber-400 bg-amber-500/10",
+  };
+
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-neutral-800/60 last:border-0 animate-fade-in">
-      <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center shrink-0 mt-0.5">
-        <span className="material-icons-round text-violet-400 text-[15px]">{icon}</span>
+    <div className="flex items-start gap-3 py-3 border-b border-neutral-800/60 last:border-0 animate-fade-in group cursor-default">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover:scale-110 ${colors[color] || colors.violet}`}>
+        <span className="material-icons-round text-[15px]">{icon}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate">{title}</p>
+        <p className="text-sm font-medium text-white truncate group-hover:text-violet-300 transition-colors">{title}</p>
         <p className="text-xs text-neutral-500 truncate">{desc}</p>
       </div>
       <span className="text-[10px] text-neutral-600 shrink-0 pt-0.5">{since}</span>
@@ -140,13 +148,13 @@ function ResilienceHUD() {
 
   useEffect(() => {
     const check = () => {
-      fetch("http://localhost:8000/api/v1/health")
+      fetch("/api/v1/health") // Use relative path for gateway compatibility
         .then(res => res.json())
         .then(setHealth)
         .catch(() => setHealth({ status: "DISCONNECTED" }));
     };
     check();
-    const timer = setInterval(check, 60000);
+    const timer = setInterval(check, 30000); // 30s updates
     return () => clearInterval(timer);
   }, []);
 
@@ -154,15 +162,88 @@ function ResilienceHUD() {
   const isOptimal = health?.status === "OPTIMAL" || isHealthy;
 
   return (
-    <div className="flex items-center gap-2 bg-neutral-900/40 border border-neutral-800/60 px-3 py-1.5 rounded-full">
+    <div className="flex items-center gap-3 bg-black/40 border border-white/5 px-4 py-2 rounded-full backdrop-blur-md">
       <div className={`w-2 h-2 rounded-full animate-pulse ${
         isOptimal ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : 
         health?.status === "DEGRADED" ? "bg-amber-500 shadow-[0_0_8px_#f59e0b]" : 
         "bg-red-500 shadow-[0_0_8px_#ef4444]"
       }`} />
-      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
-        {isOptimal ? "Engine Optimal" : health?.status === "DEGRADED" ? "Engine Degraded" : "Engine Offline"}
-      </span>
+      <div className="flex flex-col">
+        <span className="text-[9px] font-black text-neutral-200 uppercase tracking-widest leading-none">
+          {isOptimal ? "Engine Optimal" : health?.status === "DEGRADED" ? "Engine Degraded" : "Engine Offline"}
+        </span>
+        {health?.system && (
+          <span className="text-[8px] text-neutral-500 font-mono mt-0.5">
+            CPU: {health.system.cpu_usage_percent}% | RAM: {health.system.memory_usage_percent}%
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Mission Control Log ───────────────────────────────────────────────────────
+
+function MissionControl() {
+  const [logs, setLogs] = useState<{agent: string, status: string, message: string, time: string, strategic?: boolean}[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Connect to WebSocket for agent updates
+    const ws = new WebSocket("ws://localhost:8000/api/v1/ws");
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "agent_update") {
+        setLogs(prev => [{
+          agent: data.agent,
+          status: data.status,
+          message: data.message,
+          strategic: data.strategic,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        }, ...prev].slice(0, 50));
+      }
+    };
+
+    return () => ws.close();
+  }, []);
+
+  return (
+    <div className="card bg-black/60 border-neutral-800/80 overflow-hidden flex flex-col h-[280px] shadow-[0_0_20px_rgba(139,92,246,0.05)]">
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
+          <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Mission Control Console</h3>
+        </div>
+        <span className="text-[9px] font-mono text-neutral-600">NEURAL_STREAM_V4.0</span>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-[10px]" ref={scrollRef}>
+        {logs.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-2">
+            <span className="material-icons-round text-2xl">sensors</span>
+            <p className="uppercase tracking-widest text-[9px]">Awaiting Neural Signal...</p>
+          </div>
+        ) : (
+          logs.map((log, i) => (
+            <div key={i} className={`flex gap-3 animate-slide-in-right p-1.5 rounded-lg transition-all duration-500 ${
+              log.strategic ? "bg-violet-500/5 border border-violet-500/10 shadow-[0_0_15px_rgba(139,92,246,0.1)]" : ""
+            }`}>
+              <span className="text-neutral-700 whitespace-nowrap">[{log.time}]</span>
+              <span className={`font-bold whitespace-nowrap ${
+                log.status === "error" ? "text-red-400" : 
+                log.status === "success" ? "text-emerald-400" : 
+                log.status === "warning" ? "text-amber-400" : 
+                log.strategic ? "text-violet-300 animate-pulse-slow" : "text-violet-400"
+              }`}>[{log.agent.toUpperCase()}]</span>
+              <span className={`leading-relaxed ${log.strategic ? "text-neutral-200" : "text-neutral-400"}`}>
+                {log.message}
+              </span>
+              {log.strategic && <span className="ml-auto material-icons-round text-[12px] text-violet-500/50">psychology</span>}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -245,7 +326,7 @@ export default function Dashboard() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <StatsCard
           loading={loading}
           icon="send" label="Applications" color="violet"
@@ -259,36 +340,22 @@ export default function Dashboard() {
         <StatsCard
           loading={loading}
           icon="event_available" label="Interviews" color="sky"
-          value={stats?.interviews ?? 0} sub="Scheduled or completed"
+          value={stats?.interviews ?? 0} sub="Scheduled"
         />
         <StatsCard
           loading={loading}
           icon="auto_awesome" label="AI Matches" color="amber"
-          value={stats?.ai_matches_above_threshold ?? 0} sub={`Above ${profile?.structured_data?.match_threshold ?? 80}% threshold`}
+          value={stats?.ai_matches_above_threshold ?? 0} sub={`Above threshold`}
+        />
+        <StatsCard
+          loading={loading}
+          icon="gpp_good" label="Risks Avoided" color="rose"
+          value={stats?.risks_avoided ?? 0} sub="Neutralized threats"
         />
       </div>
 
-      {/* Phase 6: Discovery Quick-Start */}
-      <div className="bg-neutral-900/40 border border-neutral-800/60 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-violet-500/5 to-transparent pointer-events-none" />
-        <div className="z-10">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-icons-round text-violet-400">search</span>
-            Discover New Opportunities
-          </h2>
-          <p className="text-xs text-neutral-500 mt-1 max-w-lg">
-            Hunter AI can autonomously scan the web for jobs matching your profile. 
-            Launch a discovery agent to find high-match roles while you sleep.
-          </p>
-        </div>
-        <Link 
-          href="/discovery" 
-          className="z-10 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-500/20 flex items-center gap-2 group-hover:scale-105"
-        >
-          <span className="material-icons-round text-sm">rocket_launch</span>
-          Start Discovery
-        </Link>
-      </div>
+      {/* NEW: Mission Control Console */}
+      <MissionControl />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Top Picks */}

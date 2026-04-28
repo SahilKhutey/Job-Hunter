@@ -4,10 +4,9 @@ from app.ai.llm_client import llm_client
 
 logger = logging.getLogger(__name__)
 
-def fix_resume_ai(resume_json: dict, job_desc: str, missing_keywords: list, issues: list):
+async def fix_resume_ai(resume_json: dict, job_desc: str, missing_keywords: list, issues: list):
     """
-    Uses LLM to automatically improve a resume based on specific ATS feedback and job requirements.
-    Enforces strict truthfulness and context-aware optimization.
+    Uses LLM to automatically improve a resume based on ATS feedback (Async).
     """
     prompt = f"""
     You are an expert resume optimization engine. Your goal is to improve the candidate's resume to achieve a higher ATS score while maintaining 100% integrity.
@@ -42,7 +41,7 @@ def fix_resume_ai(resume_json: dict, job_desc: str, missing_keywords: list, issu
     """
 
     try:
-        response = llm_client.chat_completion(
+        response = await llm_client.chat_completion(
             messages=[
                 {"role": "system", "content": "You are a professional resume optimization agent. Always return valid JSON."},
                 {"role": "user", "content": prompt}

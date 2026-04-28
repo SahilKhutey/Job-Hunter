@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from app.agents.execution_agent import ExecutionAgent
 from app.ai.llm_client import llm_client
 from app.utils.audit_logger import audit_logger
@@ -9,12 +9,9 @@ from app.models.job import Application
 from sqlalchemy.orm import Session
 from app.services.automation_service import automation_service
 from app.utils.privacy import privacy_shield
-
-
+from app.agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
-
-from app.agents.base_agent import BaseAgent
 
 class ApplicationAgent(BaseAgent):
     """
@@ -29,9 +26,23 @@ class ApplicationAgent(BaseAgent):
         self.browser = ExecutionAgent(user_id)
 
     async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        # This is a placeholder for the pipeline orchestrator
-        # In a real run, this would trigger the async apply()
-        logger.info(f"[Agent: {self.name}] Application logic would execute here.")
+        """
+        Orchestrator entry point.
+        """
+        logger.info(f"[Agent: {self.name}] Checking for deployment trigger...")
+        
+        # In the context of the pipeline, we only 'apply' if certain conditions are met
+        # and if the user/orchestrator has enabled 'auto_apply'
+        job = state.get("job")
+        resume_path = state.get("resume_pdf_path")
+        
+        if state.get("action_decision") == "AUTO_APPLY_READY" and job and resume_path:
+            logger.info(f"[Agent: {self.name}] AUTO_APPLY_READY detected. Starting application engine...")
+            success = await self.apply(job.get("id", 0), job.get("url", ""), resume_path)
+            state["application_success"] = success
+        else:
+            logger.info(f"[Agent: {self.name}] No deployment action triggered. Decision: {state.get('action_decision')}")
+            
         return state
 
     async def apply(self, job_id: int, job_url: str, tailored_resume_path: str):
@@ -107,34 +118,27 @@ class ApplicationAgent(BaseAgent):
                     logger.warning("No actions taken on this page. Might be stuck or finished.")
                     break
                 
-                # 6. HITL if it looks like a final 'Submit'
-                # (Heuristic: LLM will mark the action reason as "submit")
-                # We handle this inside _smart_fill_page or check here
-                
             if is_complete:
                 await emit_agent_update("ExecutionAgent", "success", "Application submitted successfully!")
                 await self.browser.save_session()
             else:
                 await emit_agent_update("ExecutionAgent", "completed", "Application process finished.")
             
-            logger.info(f"Successfully processed {job_url}")
-            
-            # Log to Database
-            new_app = Application(
-                user_id=int(self.user_id),
-                job_id=job_id,
-                status="applied" if is_complete else "processed",
-                resume_path=tailored_resume_path,
-                resume_version="tailored_ai_v1",
-                platform=platform,
-                application_metadata={"steps_taken": step_count, "final_url": self.browser.page.url}
-            )
-            self.db.add(new_app)
-            self.db.commit()
+            # Log to Database if DB is provided
+            if self.db:
+                new_app = Application(
+                    user_id=int(self.user_id),
+                    job_id=job_id,
+                    status="applied" if is_complete else "processed",
+                    resume_path=tailored_resume_path,
+                    resume_version="tailored_ai_v1",
+                    platform=platform,
+                    application_metadata={"steps_taken": step_count, "final_url": self.browser.page.url}
+                )
+                self.db.add(new_app)
+                self.db.commit()
             
             return True
-
-            
         except Exception as e:
             import traceback
             error_msg = traceback.format_exc()
@@ -154,32 +158,30 @@ class ApplicationAgent(BaseAgent):
         
         await emit_agent_update("AutomationAgent", "running", f"AI mapping {len(elements)} elements to profile...")
         
-        actions = llm_client.map_form_fields(clean_profile, elements)
+        # Await the async LLM call
+        actions = await llm_client.map_form_fields(clean_profile, elements)
         logger.info(f"AI suggested {len(actions)} actions.")
         actions_taken = 0
         
         for action in actions:
-            logger.debug(f"Action data: {action}")
             selector = action.get("selector")
             act_type = action.get("action")
             value = action.get("value")
             reason = action.get("reason", "No reason provided")
-            is_nav = action.get("is_navigation", False)
             
             if not selector or not act_type:
                 continue
                 
-            # HITL logic: If reason implies 'final submit' or is_nav is true and name is Submit
+            # HITL logic
             is_final_submit = "submit" in reason.lower() or "finish" in reason.lower()
             
             if is_final_submit:
                 await emit_agent_update("ExecutionAgent", "warning", "Final submission button detected. Awaiting review...")
-                await automation_service.request_confirmation(str(self.user_id))
+                await automation_service.request_confirmation(str(job_id))
             
             await emit_automation_step(f"Action: {act_type} on {selector}", "in_progress")
-            logger.info(f"Executing: {act_type} on {selector} ({reason})")
             
-            # Unmask value (restore real PII from tokens)
+            # Unmask value
             real_value = privacy_shield.unmask_value(value, pii_mapping)
             
             try:
@@ -197,17 +199,6 @@ class ApplicationAgent(BaseAgent):
                     actions_taken += 1
                 
                 await emit_automation_step(f"Action: {act_type} on {selector}", "completed")
-                audit_logger.log_event("AUTOMATION_ACTION", self.user_id, {
-                    "action": act_type,
-                    "selector": selector,
-                    "reason": reason,
-                    "status": "success"
-                })
-                
-                # Validation check after each action
-                if await self._detect_form_errors():
-                    logger.warning(f"Form validation error detected after {act_type} on {selector}")
-                    await emit_agent_update("ExecutionAgent", "warning", "Validation error detected. Retrying...")
             except Exception as e:
                 logger.error(f"Failed action {act_type} on {selector}: {e}")
                 await emit_automation_step(f"Action: {act_type} on {selector}", "error")
@@ -234,26 +225,8 @@ class ApplicationAgent(BaseAgent):
         """Heuristics to detect if the application is complete."""
         success_keywords = ["thank you", "received", "submitted", "confirmed", "success"]
         url = self.browser.page.url.lower()
-        
         if any(k in url for k in ["success", "confirmation", "thank-you"]):
             return True
-            
-        content = await self.browser.page.content()
-        content = content.lower()
-        
-        # Look for these keywords in visible text, not just HTML source
-        # But for now, simple content check
+        content = (await self.browser.page.content()).lower()
         matches = [k for k in success_keywords if k in content]
-        return len(matches) >= 2 # At least 2 keywords to be safe
-
-    async def _detect_form_errors(self) -> bool:
-        """Detects if a validation error is currently visible on the page."""
-        error_keywords = [
-            "is required", "invalid", "please correct", "error occurred", 
-            "mandatory", "not a valid", "required field"
-        ]
-        
-        # We look for visible elements with high contrast or common error classes
-        page_text = (await self.browser.page.content()).lower()
-        return any(k in page_text for k in error_keywords)
-
+        return len(matches) >= 2

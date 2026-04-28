@@ -6,22 +6,23 @@ from app.agents.job_agent import JobAgent
 from app.agents.matching_agent import MatchingAgent
 from app.agents.resume_agent import ResumeAgent
 from app.agents.orchestrator import Orchestrator
-from app.core.database import SessionLocal
+from app.agents.pipeline import pipeline
+from sqlalchemy import select
+from app.core.database import AsyncSessionLocal
 from app.models.job import Job
-
 
 logger = logging.getLogger(__name__)
 
 class ApplicationEngine:
     """
-    Service layer to manage multiple application tasks.
+    Service layer to manage multiple application tasks (Async).
     """
     def __init__(self):
         self.active_tasks: Dict[str, str] = {} # job_id -> status
 
     async def start_application(self, job_id: str, job_url: str, profile_data: Dict[str, Any], resume_path: str):
         """
-        Launches an autonomous application agent for a specific job.
+        Launches an autonomous application agent for a specific job (Async).
         """
         self.active_tasks[job_id] = "Starting..."
         
@@ -31,51 +32,57 @@ class ApplicationEngine:
         return {"job_id": job_id, "status": "Initiated"}
 
     async def _run_agent(self, job_id: str, job_url: str, profile_data: Dict[str, Any], resume_path: str):
-        db = SessionLocal()
-        try:
-            self.active_tasks[job_id] = "Initializing Pipeline..."
-            user_id = str(profile_data.get("id", "default"))
-            
-            # Phase 3: Define Parallel Stages
-            # Stage 1: Analyze the Job (sequential because others depend on it)
-            # Stage 2: Match and Tailor Resume in Parallel
-            # Stage 3: Autonomous Application
-            
-            stages = [
-                [JobAgent()],
-                [MatchingAgent(), ResumeAgent()],
-                [ApplicationAgent(user_id, profile_data, db)]
-            ]
-            
-            orchestrator = Orchestrator(stages)
-            
-            initial_state = {
-                "job": {"id": int(job_id), "url": job_url, "description": ""}, # Description will be filled by JobAgent
-                "profile": profile_data,
-                "resume_path": resume_path
-            }
-            
-            self.active_tasks[job_id] = "Executing Stages..."
-            final_state = await orchestrator.run(initial_state)
-            
-            if final_state.get("error"):
-                self.active_tasks[job_id] = f"Error: {final_state['error']}"
-            else:
-                # Update Job record with latest scores
-                job_record = db.query(Job).filter(Job.id == int(job_id)).first()
-                if job_record:
-                    job_record.match_score = final_state.get("match_score", 0.0)
-                    job_record.match_analytics = final_state.get("match_analytics", {})
-                    db.commit()
+        async with AsyncSessionLocal() as db:
+            try:
+                self.active_tasks[job_id] = "Initializing Pipeline..."
+                user_id = str(profile_data.get("id", "default"))
                 
-                self.active_tasks[job_id] = "Completed"
+                # Fetch job from DB to get existing description or other metadata
+                stmt = select(Job).filter(Job.id == int(job_id))
+                result = await db.execute(stmt)
+                job_record = result.scalar_one_or_none()
                 
-        except Exception as e:
-            logger.error(f"Engine error for job {job_id}: {e}")
-            self.active_tasks[job_id] = f"Error: {str(e)}"
-        finally:
-            db.close()
-
+                job_data = {
+                    "id": int(job_id), 
+                    "url": job_url, 
+                    "description": job_record.description if job_record else "",
+                    "title": job_record.title if job_record else "",
+                    "company": job_record.company if job_record else ""
+                }
+                
+                # Define Pipeline Stages
+                stages = [
+                    [JobAgent()], # Stage 1: Analyze Job (fills description/skills if missing)
+                    [MatchingAgent(), ResumeAgent()], # Stage 2: Parallel Match & Tailor
+                    [ApplicationAgent(user_id, profile_data, db)] # Stage 3: Deploy
+                ]
+                
+                orchestrator = Orchestrator(stages)
+                
+                initial_state = {
+                    "job": job_data,
+                    "profile": profile_data,
+                    "resume_pdf_path": resume_path,
+                    "action_decision": "AUTO_APPLY_READY" # Default to ready if we are in this engine
+                }
+                
+                self.active_tasks[job_id] = "Executing Stages..."
+                final_state = await orchestrator.run(initial_state)
+                
+                if final_state.get("error"):
+                    self.active_tasks[job_id] = f"Error: {final_state['error']}"
+                else:
+                    # Update Job record with latest scores and status
+                    if job_record:
+                        job_record.match_score = final_state.get("match_score", job_record.match_score)
+                        job_record.match_analytics = final_state.get("match_analytics", job_record.match_analytics)
+                        await db.commit()
+                    
+                    self.active_tasks[job_id] = "Completed"
+                    
+            except Exception as e:
+                logger.error(f"Engine error for job {job_id}: {e}")
+                self.active_tasks[job_id] = f"Error: {str(e)}"
 
     def get_status(self, job_id: str):
         return self.active_tasks.get(job_id, "Not Found")

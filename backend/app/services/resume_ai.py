@@ -4,10 +4,11 @@ from app.ai.llm_client import llm_client
 
 logger = logging.getLogger(__name__)
 
-def parse_resume_to_json(text: str):
+async def parse_resume_to_json(text: str):
     """
-    Uses LLM to transform raw resume text into a structured profile schema.
+    Uses LLM to transform raw resume text into a structured profile schema (Async).
     """
+    # Use a raw string or just avoid .format() if using f-strings with JSON-like content
     prompt = f"""
     You are an expert recruitment AI. Analyze the following raw resume text and extract structured information into a precise JSON format.
     
@@ -53,9 +54,7 @@ def parse_resume_to_json(text: str):
     """
 
     try:
-        # Using the existing llm_client if available, otherwise fallback to direct openai
-        # Assuming llm_client has a method for general completion
-        response = llm_client.chat_completion(
+        response = await llm_client.chat_completion(
             messages=[
                 {"role": "system", "content": "You are a specialized resume parsing engine."},
                 {"role": "user", "content": prompt}
@@ -63,7 +62,6 @@ def parse_resume_to_json(text: str):
             temperature=0
         )
         
-        # Clean the response string if it contains markdown code blocks
         content = response.strip()
         if content.startswith("```json"):
             content = content[7:-3].strip()

@@ -7,11 +7,14 @@ from app.models.user import User
 from app.auth.jwt_handler import ALGORITHM
 from sqlalchemy.orm import Session
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 async def get_current_user(
     request: Request,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -22,7 +25,9 @@ async def get_current_user(
     # 1. Check for Extension Token (X-HOS-Extension-Token)
     ext_token = request.headers.get("X-HOS-Extension-Token")
     if ext_token:
-        user = db.query(User).filter(User.extension_token == ext_token).first()
+        stmt = select(User).filter(User.extension_token == ext_token)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
         if user and user.is_active:
             return user
     
@@ -41,7 +46,10 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
         
-    user = db.query(User).filter(User.id == user_id).first()
+    user_stmt = select(User).filter(User.id == user_id)
+    user_result = await db.execute(user_stmt)
+    user = user_result.scalar_one_or_none()
+    
     if user is None or not user.is_active:
         raise credentials_exception
         

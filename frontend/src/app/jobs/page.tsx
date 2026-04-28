@@ -40,6 +40,42 @@ function MatchBar({ score }: { score: number }) {
   );
 }
 
+function StrategicGuard({ score, flags }: { score: number; flags: string[] }) {
+  const isHighRisk = score > 60;
+  const colorClass = isHighRisk ? "text-red-400" : "text-emerald-400";
+  const bgClass = isHighRisk ? "bg-red-500/10 border-red-500/20" : "bg-emerald-500/10 border-emerald-500/20";
+
+  return (
+    <div className={`card p-5 border ${bgClass} transition-all duration-500`}>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Intelligence Guard</p>
+        <span className={`material-icons-round text-[18px] ${colorClass}`}>{isHighRisk ? "gpp_maybe" : "verified_user"}</span>
+      </div>
+      
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className={`text-2xl font-black tracking-tighter ${colorClass}`}>{Math.round(score)}%</span>
+        <span className="text-[10px] text-neutral-500 font-bold uppercase">Strategic Risk</span>
+      </div>
+
+      <div className="space-y-2">
+        {flags && flags.length > 0 ? (
+          flags.map(f => (
+            <div key={f} className="flex items-center gap-2">
+              <span className="material-icons-round text-red-500 text-[12px]">report</span>
+              <span className="text-[10px] text-red-400 font-bold uppercase tracking-tight">{f}</span>
+            </div>
+          ))
+        ) : (
+          <div className="flex items-center gap-2 text-emerald-400/80">
+            <span className="material-icons-round text-[12px]">check_circle</span>
+            <span className="text-[10px] font-bold uppercase tracking-tight">Verified Safe Origin</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Job Card ──────────────────────────────────────────────────────────────────
 
 function JobCard({ job, isActive, onClick }: { job: JobData; isActive: boolean; onClick: () => void }) {
@@ -85,6 +121,80 @@ function JobCard({ job, isActive, onClick }: { job: JobData; isActive: boolean; 
 
 // ── Job Detail ────────────────────────────────────────────────────────────────
 
+function StrategicAdvisor({ job }: { job: JobData }) {
+  const isHighRisk = (job.strategic_risk_score || 0) > 60;
+  const hasSkillGap = job.skill_gap.length > 0;
+  
+  // Simulated company health from LearningAgent
+  const companyHealth = {
+     score: 74,
+     recurring_flags: ["Burnout Culture", "Expectation Ambiguity"]
+  };
+
+  return (
+    <div className="card p-5 bg-violet-600/5 border-violet-500/20 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 blur-3xl group-hover:bg-violet-500/10 transition-all duration-700" />
+      <p className="text-[10px] text-violet-400 font-bold uppercase mb-4 tracking-widest flex items-center justify-between">
+        <span className="flex items-center gap-2">
+            <span className="material-icons-round text-[14px] animate-pulse">psychology</span>
+            Neural Strategic Advice
+        </span>
+        <span className="text-[9px] text-neutral-600">CONFIDENCE: 94%</span>
+      </p>
+      
+      <div className="space-y-4 relative z-10">
+        {/* Company Health HUD */}
+        <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/5">
+           <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter">Company Health: {job.company}</span>
+              <span className={`text-[10px] font-bold ${companyHealth.score > 80 ? "text-emerald-400" : "text-amber-400"}`}>{companyHealth.score}%</span>
+           </div>
+           <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-1000 ${companyHealth.score > 80 ? "bg-emerald-500" : "bg-amber-500"}`} 
+                style={{ width: `${companyHealth.score}%` }} 
+              />
+           </div>
+           {companyHealth.recurring_flags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                 {companyHealth.recurring_flags.map(f => (
+                    <span key={f} className="text-[8px] font-black bg-neutral-900 text-neutral-500 px-2 py-0.5 rounded border border-white/5 uppercase">RECURRING: {f}</span>
+                 ))}
+              </div>
+           )}
+        </div>
+
+        {isHighRisk && (
+          <div className="flex gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              <span className="text-red-400 font-bold">Negotiation Priority:</span> High risk signals detected. We recommend a <span className="text-white font-bold">15-20% compensation premium</span> to offset organizational instability.
+            </p>
+          </div>
+        )}
+        
+        {hasSkillGap && (
+          <div className="flex gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              <span className="text-amber-400 font-bold">Studio Optimization:</span> Your profile is missing <span className="text-white font-bold">{job.skill_gap[0]}</span>. Use the Studio to bridge this gap with adjacent transferable experience.
+            </p>
+          </div>
+        )}
+        
+        {!isHighRisk && !hasSkillGap && (
+          <div className="flex gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              <span className="text-emerald-400 font-bold">High-Velocity Signal:</span> Perfect skill parity detected. This is a high-probability match. Recommend immediate <span className="text-white font-bold">Auto-Apply</span> execution.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function JobDetail({ job }: { job: JobData }) {
   const router = useRouter();
   const { profileId } = useUserStore();
@@ -100,6 +210,8 @@ function JobDetail({ job }: { job: JobData }) {
         job_url: job.url,
         platform: job.company, // Simplified
         profile_id: profileId,
+        job_risk_score: job.strategic_risk_score,
+        job_red_flags: job.red_flags
       });
       router.push("/automation");
     } catch (e) {
@@ -171,38 +283,47 @@ function JobDetail({ job }: { job: JobData }) {
 
       <div className="p-8 space-y-10 overflow-y-auto flex-1 custom-scrollbar">
         {/* Intelligence Layer */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+            <StrategicAdvisor job={job} />
+            <StrategicGuard score={job.strategic_risk_score || 0} flags={job.red_flags || []} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
             <div className="card p-5 bg-neutral-900/40 border-neutral-800">
-                <p className="text-[10px] text-neutral-500 font-bold uppercase mb-4 tracking-widest">Skill Gap Analysis</p>
-                <div className="space-y-3">
-                    {job.skill_gap.length > 0 ? (
-                        job.skill_gap.map(s => (
-                            <div key={s} className="flex items-center justify-between">
-                                <span className="text-xs text-neutral-300">{s}</span>
-                                <span className="text-[10px] text-amber-400 font-bold bg-amber-400/5 px-2 py-0.5 rounded border border-amber-400/10">MISSING</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="flex items-center gap-2 text-emerald-400 py-2">
-                            <span className="material-icons-round text-[18px]">verified</span>
-                            <span className="text-xs font-bold uppercase tracking-wide">Full Skill Alignment</span>
+                <p className="text-[10px] text-neutral-500 font-bold uppercase mb-4 tracking-widest">Semantic Alignment</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                    {/* Matched Skills */}
+                    <div className="space-y-2">
+                        <p className="text-[9px] font-black text-emerald-500/60 uppercase tracking-tighter mb-2">Verified Strengths</p>
+                        <div className="flex flex-wrap gap-2">
+                            {job.matched_skills?.map(s => (
+                                <span key={s} className="px-2 py-1 bg-emerald-500/5 text-emerald-400 text-[10px] font-bold rounded border border-emerald-500/10 flex items-center gap-1">
+                                    <span className="material-icons-round text-[12px]">check_circle</span>
+                                    {s}
+                                </span>
+                            ))}
                         </div>
-                    )}
+                    </div>
+                    {/* Skill Gap */}
+                    <div className="space-y-2">
+                        <p className="text-[9px] font-black text-amber-500/60 uppercase tracking-tighter mb-2">Opportunity Gaps</p>
+                        <div className="flex flex-wrap gap-2">
+                            {job.skill_gap.length > 0 ? (
+                                job.skill_gap.map(s => (
+                                    <span key={s} className="px-2 py-1 bg-amber-500/5 text-amber-400 text-[10px] font-bold rounded border border-amber-500/10 flex items-center gap-1">
+                                        <span className="material-icons-round text-[12px]">warning</span>
+                                        {s}
+                                    </span>
+                                ))
+                            ) : (
+                                <div className="flex items-center gap-2 text-emerald-400/80 py-1">
+                                    <span className="material-icons-round text-[16px]">verified</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-tight">Full Skill Parity</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div className="card p-5 bg-neutral-900/40 border-neutral-800">
-                <p className="text-[10px] text-neutral-500 font-bold uppercase mb-4 tracking-widest">Difficulty Assessment</p>
-                <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-2xl font-bold text-white">{Math.round(job.difficulty * 100)}%</span>
-                    <span className="text-[10px] text-neutral-600 font-bold uppercase">Complexity</span>
-                </div>
-                <p className="text-[11px] text-neutral-500 leading-relaxed">
-                    {job.difficulty > 0.7 
-                        ? "High competition and specific skill requirements. Tailored application highly recommended." 
-                        : job.difficulty > 0.4 
-                        ? "Moderate match. Focus on highlighting common skills in your summary."
-                        : "High success probability. Auto-apply is likely to succeed."}
-                </p>
             </div>
         </div>
 
@@ -211,6 +332,27 @@ function JobDetail({ job }: { job: JobData }) {
           <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-4">Job Intelligence Description</p>
           <p className="text-sm text-neutral-400 leading-relaxed whitespace-pre-wrap">{job.description}</p>
         </div>
+
+        {/* Mobile Spacer */}
+        <div className="h-28 lg:hidden" />
+      </div>
+
+      {/* Floating Action Bar (Mobile) */}
+      <div className="fixed bottom-24 left-4 right-4 lg:hidden z-[70]">
+        <button 
+          onClick={handleApply}
+          disabled={applying}
+          className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-4 rounded-2xl shadow-2xl shadow-violet-500/40 flex items-center justify-center gap-3 transition-all active:scale-95 border border-violet-400/20"
+        >
+          {applying ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <span className="material-icons-round">bolt</span>
+              <span>Execute Intelligent Apply</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

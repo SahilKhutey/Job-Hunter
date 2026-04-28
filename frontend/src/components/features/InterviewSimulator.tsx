@@ -28,11 +28,23 @@ export default function InterviewSimulator({ jobId, profileId }: { jobId: number
     try {
       const data = await startInterviewSession(jobId, profileId);
       setQuestions(data.questions);
+      
+      const firstQ = data.questions[0];
+      const qPrefix = firstQ.type === "strategic" ? "[Strategic Question] " : "";
+      
+      let welcomeMsg = `Welcome! I'm your AI Interviewer. We'll be practicing for this position.`;
+      
+      // Add risk awareness if available in the job data (we might need to fetch it or pass it)
+      // For now, we'll use the question type as a proxy
+      if (data.questions.some((q: any) => q.type === "strategic")) {
+        welcomeMsg += `\n\n⚠️ NOTE: I've detected high-stakes elements for this role. I will include strategic questions to test your situational resilience.`;
+      }
+
       setMessages([
         {
           id: "m1",
           type: "ai",
-          text: `Welcome! I'm your AI Interviewer. We'll be practicing for the position. Here's your first question: \n\n ${data.questions[0].question}`
+          text: `${welcomeMsg}\n\nHere's your first question: \n\n ${qPrefix}${firstQ.question}`
         }
       ]);
     } catch (err) {
@@ -66,10 +78,12 @@ export default function InterviewSimulator({ jobId, profileId }: { jobId: number
       const nextIdx = currentIdx + 1;
       if (nextIdx < questions.length) {
         setCurrentIdx(nextIdx);
+        const nextQ = questions[nextIdx];
+        const qPrefix = nextQ.type === "strategic" ? "[Strategic Question] " : "";
         const nextQMsg: Message = {
           id: "q" + nextIdx,
           type: "ai",
-          text: `Next Question: ${questions[nextIdx].question}`
+          text: `Next Question: \n\n ${qPrefix}${nextQ.question}`
         };
         setMessages(prev => [...prev, feedbackMsg, nextQMsg]);
       } else {
@@ -94,11 +108,16 @@ export default function InterviewSimulator({ jobId, profileId }: { jobId: number
       <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.type === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] p-4 rounded-2xl ${
+            <div className={`max-w-[80%] p-4 rounded-2xl relative ${
               m.type === "user" 
                 ? "bg-violet-600 text-white rounded-tr-none" 
                 : "bg-neutral-800 text-neutral-200 rounded-tl-none border border-neutral-700"
             }`}>
+              {m.type === "ai" && m.text.includes("Strategic Question") && (
+                <div className="absolute -top-2 -right-2 bg-amber-500 text-black rounded-full p-1 shadow-lg flex items-center justify-center animate-bounce">
+                  <span className="material-icons-round text-[14px]">gpp_maybe</span>
+                </div>
+              )}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{m.text}</p>
               {m.feedback && (
                 <div className="mt-4 pt-4 border-t border-white/10 space-y-2">

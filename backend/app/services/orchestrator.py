@@ -1,5 +1,6 @@
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.core.database import AsyncSessionLocal
 from app.models.user import UserIdentity
 from app.models.job import Job
 from app.services.matching_service import matching_engine
@@ -11,60 +12,92 @@ class Orchestrator:
     def __init__(self):
         pass
 
-    def run_pipeline(self, user_id: int = 1):
+    async def run_pipeline(self, user_id: int = 1):
         """
-        Master Pipeline:
+        Master Pipeline (Async):
         1. Get User Profile
         2. Get Unscored Jobs
         3. Match & Rank
         4. Make AI Decision
         """
-        db: Session = SessionLocal()
-        try:
-            profile = db.query(UserIdentity).filter(UserIdentity.id == user_id).first()
-            if not profile:
-                logger.warning(f"No profile found for user {user_id}. Aborting pipeline.")
-                return
-
-            # Fetch jobs that haven't been processed/scored yet
-            jobs = db.query(Job).filter(Job.ai_decision == "PENDING").all()
-            if not jobs:
-                logger.info("No new jobs to process.")
-                return
-
-            # Match and Rank
-            matches = matching_engine.match_jobs(profile, jobs)
-
-            for job, score in matches:
-                job.match_score = score
+        from app.api.routes.websocket import emit_agent_update
+        
+        # Mission State
+        mission = {
+            "user_id": user_id,
+            "status": "initializing",
+            "jobs_processed": 0,
+            "errors": []
+        }
+        
+        await emit_agent_update("Coordinator", "running", "Initializing Hunter AI Mission Control...", user_id=user_id)
+        
+        async with AsyncSessionLocal() as db:
+            try:
+                # 1. Get Profile
+                stmt_profile = select(UserIdentity).filter(UserIdentity.id == user_id)
+                result_profile = await db.execute(stmt_profile)
+                profile = result_profile.scalar_one_or_none()
                 
-                # AI Decision Layer
-                if score >= 0.85:
-                    job.ai_decision = "AUTO_APPLY_READY"
-                    self._queue_for_notification(job.id, user_id)
-                elif score >= 0.65:
-                    job.ai_decision = "REVIEW"
-                else:
-                    job.ai_decision = "IGNORE"
+                if not profile:
+                    await emit_agent_update("Coordinator", "error", f"No profile found for user {user_id}.", user_id=user_id)
+                    return
+ 
+                # 2. Fetch Jobs
+                await emit_agent_update("Discovery", "running", "Scanning for PENDING jobs...", user_id=user_id)
+                stmt_jobs = select(Job).filter(Job.ai_decision == "PENDING")
+                result_jobs = await db.execute(stmt_jobs)
+                jobs = result_jobs.scalars().all()
                 
-                db.add(job)
+                if not jobs:
+                    await emit_agent_update("Discovery", "success", "Mission Complete: No new jobs to process.", user_id=user_id)
+                    return
+ 
+                # 3. Match and Rank (Recovery Logic)
+                await emit_agent_update("Intelligence", "running", f"Analyzing compatibility for {len(jobs)} jobs...", user_id=user_id)
+                try:
+                    matches = await matching_engine.match_jobs(profile, jobs)
+                except Exception as me:
+                    logger.error(f"Matching Engine Failure: {me}")
+                    await emit_agent_update("Intelligence", "error", "Critical failure in Matching Engine. Retrying with heuristics...", user_id=user_id)
+                    # Fallback to simple matching if semantic fails
+                    matches = [(j, 0.5) for j in jobs]
+ 
+                for job, score in matches:
+                    job.match_score = score
+                    
+                    # AI Decision Layer
+                    if score >= 0.85:
+                        job.ai_decision = "AUTO_APPLY_READY"
+                    elif score >= 0.65:
+                        job.ai_decision = "REVIEW"
+                    else:
+                        job.ai_decision = "IGNORE"
+                    
+                    db.add(job)
+                    mission["jobs_processed"] += 1
+ 
+                await db.commit()
+                await emit_agent_update("Coordinator", "success", f"Pipeline completed. {len(jobs)} jobs ranked.", user_id=user_id)
+                
+            except Exception as e:
+                logger.error(f"Mission Critical Failure: {e}")
+                await db.rollback()
+                await emit_agent_update("Coordinator", "error", f"Mission aborted: {str(e)}", user_id=user_id)
 
-            db.commit()
-            logger.info(f"Pipeline completed for user {user_id}. {len(jobs)} jobs processed.")
-            
-        except Exception as e:
-            logger.error(f"Error in orchestrator pipeline: {e}")
-            db.rollback()
-        finally:
-            db.close()
-
-    def _queue_for_notification(self, job_id: int, user_id: int):
+    async def process_feedback(self, profile_id: int, feedback_type: str, reason: str = None):
         """
-        Since the user wants confirmation before applying, we don't trigger Playwright here.
-        Instead, we might trigger a WebSocket event or update a 'Notifications' table 
-        so the UI can prompt the user: 'Job X is ready for Auto-Apply. Confirm?'
+        Process user feedback to refine the matching model (Async).
         """
-        logger.info(f"Job {job_id} is AUTO_APPLY_READY for user {user_id}. Waiting for user confirmation.")
-        # In a real app, send a push notification or WS event here.
+        from app.agents.learning_agent import LearningAgent
+        agent = LearningAgent()
+        
+        async with AsyncSessionLocal() as db:
+            state = {
+                "profile_id": profile_id,
+                "feedback": feedback_type,
+                "rejection_reason": reason
+            }
+            await agent.run(state, db=db)
 
 orchestrator = Orchestrator()

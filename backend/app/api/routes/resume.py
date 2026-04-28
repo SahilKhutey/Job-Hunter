@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import logging
 import os
 
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User, UserIdentity
+from app.models.profile import Profile
 from app.services.resume_tailor import tailor_resume
 from app.services.resume_pdf import generate_resume_pdf
 from app.services.resume_scorer import score_resume
 from app.services.resume_fix_pipeline import auto_fix_resume_pipeline
-
-
 
 router = APIRouter(prefix="/resume", tags=["Resume Optimization"])
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def tailor_resume_endpoint(
     payload: dict, 
     current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Takes a job description and the user's base profile, returns a tailored JSON resume and a PDF download path.
@@ -30,9 +30,14 @@ async def tailor_resume_endpoint(
         if not job_description:
             raise HTTPException(status_code=400, detail="Job description is required")
 
-        # Get user's base profile - Try UserIdentity first, then fallback to Profile model
-        identity = db.query(UserIdentity).filter(UserIdentity.user_id == current_user.id).first()
-        profile = db.query(Profile).filter(Profile.email == current_user.email).first()
+        # Get user's base profile
+        identity_stmt = select(UserIdentity).filter(UserIdentity.user_id == current_user.id)
+        identity_result = await db.execute(identity_stmt)
+        identity = identity_result.scalar_one_or_none()
+        
+        profile_stmt = select(Profile).filter(Profile.email == current_user.email)
+        profile_result = await db.execute(profile_stmt)
+        profile = profile_result.scalar_one_or_none()
 
         if identity and identity.identity_data:
             base_profile = identity.identity_data
@@ -55,12 +60,10 @@ async def tailor_resume_endpoint(
 
         base_profile["email"] = current_user.email
 
-        # AI Tailoring
-        tailored_data = tailor_resume(base_profile, job_description)
+        # AI Tailoring (Async)
+        tailored_data = await tailor_resume(base_profile, job_description)
         
-        # Generate PDF
-        # We'll store it in a public-accessible dir or a temporary one
-        # For this prototype, we'll use an 'outputs' folder
+        # Generate PDF (Sync for now)
         filename = f"tailored_resume_{current_user.id}_{int(os.times()[4])}.pdf"
         output_dir = "static/resumes"
         os.makedirs(output_dir, exist_ok=True)
@@ -94,7 +97,8 @@ async def score_resume_endpoint(
         if not resume_text or not job_description:
             raise HTTPException(status_code=400, detail="Missing required evaluation data")
 
-        results = score_resume(resume_text, resume_json or {}, job_description)
+        # Async Scoring
+        results = await score_resume(resume_text, resume_json or {}, job_description)
         return results
     except Exception as e:
         logger.error(f"Scoring Route Error: {e}")
@@ -116,10 +120,9 @@ async def fix_resume_endpoint(
         if not resume_text or not job_description:
             raise HTTPException(status_code=400, detail="Missing required optimization data")
 
-        results = auto_fix_resume_pipeline(resume_text, resume_json or {}, job_description)
+        # Async Fix Pipeline
+        results = await auto_fix_resume_pipeline(resume_text, resume_json or {}, job_description)
         return results
     except Exception as e:
         logger.error(f"Fix Route Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-

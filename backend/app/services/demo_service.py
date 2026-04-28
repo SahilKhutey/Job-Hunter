@@ -1,7 +1,5 @@
-import random
-from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 from app.models.job import Job, Application
 from app.models.profile import Profile
 from app.models.user import User, UserIdentity
@@ -11,23 +9,24 @@ DEMO_EMAIL = "demo@hunteros.ai"
 DEMO_PASSWORD = "demo_password_2026"
 DEMO_NAME = "Sahil Khutey"
 
-def initialize_demo_account(db: Session):
+async def initialize_demo_account(db: AsyncSession):
     """
-    Ensures the demo user exists and is fully seeded with realistic data.
+    Ensures the demo user exists and is fully seeded with realistic data (Async).
     """
     # 1. Setup Demo User
-    print(f"Checking for demo user: {DEMO_EMAIL}...")
-    user = db.query(User).filter(User.email == DEMO_EMAIL).first()
+    stmt = select(User).filter(User.email == DEMO_EMAIL)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
     if not user:
-        print("Creating new demo user...")
         user = User(
             email=DEMO_EMAIL,
             hashed_password=hash_password(DEMO_PASSWORD),
             full_name=DEMO_NAME
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
         
         identity = UserIdentity(
             user_id=user.id, 
@@ -41,9 +40,7 @@ def initialize_demo_account(db: Session):
                 "visa": "Citizen",
                 "relocation": "Yes",
                 "notice_period": "Immediate",
-                "salary_expectation": "$180,000 - $220,000"
-            },
-            identity_data={
+                "salary_expectation": "$180,000 - $220,000",
                 "summary": "Principal AI Architect with expertise in Multi-Agent Systems, Computer Vision, and Distributed Infrastructure.",
                 "job_title": "Principal AI Architect",
                 "skills": ["Python", "TypeScript", "FastAPI", "React", "Next.js", "PyTorch", "Docker", "Kubernetes", "OpenAI API", "Playwright"],
@@ -71,10 +68,13 @@ def initialize_demo_account(db: Session):
             }
         )
         db.add(identity)
-        db.commit()
+        await db.commit()
     
     # 2. Setup Profile
-    profile = db.query(Profile).filter(Profile.email == DEMO_EMAIL).first()
+    profile_stmt = select(Profile).filter(Profile.email == DEMO_EMAIL)
+    profile_result = await db.execute(profile_stmt)
+    profile = profile_result.scalar_one_or_none()
+
     if not profile:
         profile = Profile(
             email=DEMO_EMAIL,
@@ -85,7 +85,7 @@ def initialize_demo_account(db: Session):
             raw_resume_text="Sahil Khutey. Principal AI Architect. Expert in building autonomous agent ecosystems..."
         )
         db.add(profile)
-        db.commit()
+        await db.commit()
 
     # 3. Setup Jobs
     companies = [
@@ -100,7 +100,10 @@ def initialize_demo_account(db: Session):
     ]
     
     for comp, title, loc, source, skills, salary in companies:
-        existing = db.query(Job).filter(Job.company == comp, Job.title == title).first()
+        job_stmt = select(Job).filter(Job.company == comp, Job.title == title)
+        job_result = await db.execute(job_stmt)
+        existing = job_result.scalar_one_or_none()
+
         if not existing:
             job = Job(
                 title=title,
@@ -111,16 +114,18 @@ def initialize_demo_account(db: Session):
                 skills_required=skills,
                 salary_range=salary,
                 match_score=random.uniform(0.75, 0.98),
-                ai_decision="AUTO_APPLY_READY" if random.random() > 0.5 else "REVIEW"
+                ai_decision="AUTO_APPLY_READY" if random.random() > 0.5 else "REVIEW",
+                match_analytics={"match_level": "High", "reasons": ["Skill overlap", "Relevant experience"]}
             )
             db.add(job)
-    db.commit()
+    await db.commit()
 
     # 4. Applications
-    db.query(Application).filter(Application.user_id == user.id).delete()
-    db.commit()
+    await db.execute(delete(Application).filter(Application.user_id == user.id))
+    await db.commit()
     
-    jobs = db.query(Job).all()
+    jobs_result = await db.execute(select(Job))
+    jobs = jobs_result.scalars().all()
     statuses = ["applied", "interview", "offer", "rejected", "shortlisted"]
     
     for i, job in enumerate(jobs):
@@ -133,9 +138,10 @@ def initialize_demo_account(db: Session):
             resume_version="Demo_Architect_v1",
             resume_path="/static/resumes/demo_resume.pdf",
             cover_letter="Sample cover letter",
-            platform="linkedin"
+            platform="linkedin",
+            applied_match_score=job.match_score
         )
         db.add(app)
-    db.commit()
+    await db.commit()
     
     return user

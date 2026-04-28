@@ -66,7 +66,12 @@ export default function AssistantPage() {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                        <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Match Score</p>
-                       <p className="text-sm font-bold text-white">{Math.round(job.match_score * 100)}%</p>
+                       <div className="flex items-center gap-2 justify-end">
+                          <p className="text-sm font-bold text-white">{Math.round(job.match_score * 100)}%</p>
+                          {(job.strategic_risk_score || 0) > 60 && (
+                            <span className="material-icons-round text-[14px] text-amber-500 animate-pulse" title="High Risk: Strategic Practice Recommended">gpp_maybe</span>
+                          )}
+                       </div>
                     </div>
                     <span className="material-icons-round text-neutral-700 group-hover:text-violet-500 transition-colors">play_circle_filled</span>
                   </div>
@@ -86,14 +91,37 @@ export default function AssistantPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <button 
-            onClick={() => setSelectedJobId(null)}
-            className="text-xs text-neutral-500 hover:text-white flex items-center gap-1 transition-colors"
-          >
-            <span className="material-icons-round text-sm">arrow_back</span>
-            Back to Job Selection
-          </button>
-          {profileId && <InterviewSimulator jobId={selectedJobId} profileId={profileId} />}
+          <div className="flex justify-between items-center">
+            <button 
+              onClick={() => setSelectedJobId(null)}
+              className="text-xs text-neutral-500 hover:text-white flex items-center gap-1 transition-colors"
+            >
+              <span className="material-icons-round text-sm">arrow_back</span>
+              Back to Job Selection
+            </button>
+            <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-neutral-800">
+               <button 
+                  onClick={() => setActiveTab("interview")}
+                  className={`px-4 py-1 text-[10px] font-bold rounded transition-all ${activeTab === "interview" ? "bg-violet-600 text-white" : "text-neutral-500"}`}
+               >
+                  Simulator
+               </button>
+               <button 
+                  onClick={() => setActiveTab("negotiation")}
+                  className={`px-4 py-1 text-[10px] font-bold rounded transition-all ${activeTab === "negotiation" ? "bg-amber-600 text-white" : "text-neutral-500"}`}
+               >
+                  Negotiation
+               </button>
+            </div>
+          </div>
+          
+          {profileId && (
+            activeTab === "interview" ? (
+              <InterviewSimulator jobId={selectedJobId} profileId={profileId} />
+            ) : (
+              <NegotiationCopilot job={jobs.find(j => j.id === selectedJobId)} />
+            )
+          )}
         </div>
       )}
     </div>

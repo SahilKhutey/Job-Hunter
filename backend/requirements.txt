@@ -23,3 +23,8 @@ sentry-sdk[fastapi]
 sentence-transformers
 faiss-cpu
 slowapi
+pytest
+pytest-asyncio
+pytest-playwright
+pytest-mock
+psutil

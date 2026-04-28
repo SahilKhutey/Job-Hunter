@@ -1,9 +1,9 @@
 import json
 from app.ai.llm_client import llm_client
 
-def generate_resume_feedback(resume_text: str, job_desc: str, missing_keywords: list):
+async def generate_resume_feedback(resume_text: str, job_desc: str, missing_keywords: list):
     """
-    Uses AI to provide qualitative feedback on resume-job alignment.
+    Uses AI to provide qualitative feedback on resume-job alignment (Async).
     """
     prompt = f"""
     You are an expert recruiter and ATS specialist. 
@@ -25,7 +25,7 @@ def generate_resume_feedback(resume_text: str, job_desc: str, missing_keywords: 
     """
 
     try:
-        res = llm_client.chat_completion(
+        res = await llm_client.chat_completion(
             messages=[
                 {"role": "system", "content": "You are a specialized career coach and ATS auditor. Always return valid JSON."},
                 {"role": "user", "content": prompt}

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -24,9 +25,6 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: Optional[str] = None
     LINKEDIN_CLIENT_SECRET: Optional[str] = None
 
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
 settings = Settings()

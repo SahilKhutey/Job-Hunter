@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db.session import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.core.database import get_db
 from app.services.interview_service import interview_service
 from app.models.job import Job
 from app.models.profile import Profile
 from pydantic import BaseModel
 from typing import List
-
-router = APIRouter()
 
 class StartSessionRequest(BaseModel):
     job_id: int
@@ -17,10 +17,17 @@ class ResponseRequest(BaseModel):
     question: str
     response: str
 
+router = APIRouter()
+
 @router.post("/start")
-async def start_interview(req: StartSessionRequest, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == req.job_id).first()
-    profile = db.query(Profile).filter(Profile.id == req.profile_id).first()
+async def start_interview(req: StartSessionRequest, db: AsyncSession = Depends(get_db)):
+    job_stmt = select(Job).filter(Job.id == req.job_id)
+    job_result = await db.execute(job_stmt)
+    job = job_result.scalar_one_or_none()
+    
+    profile_stmt = select(Profile).filter(Profile.id == req.profile_id)
+    profile_result = await db.execute(profile_stmt)
+    profile = profile_result.scalar_one_or_none()
     
     if not job or not profile:
         raise HTTPException(status_code=404, detail="Job or Profile not found")

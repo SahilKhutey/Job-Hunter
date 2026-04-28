@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Request
 print("--- STARTING HUNTEROS API ---")
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import time
 import os
@@ -24,18 +24,35 @@ from app.auth import routes as auth_routes
 from app.auth import oauth_routes
 from starlette.middleware.sessions import SessionMiddleware
 
-# Initialize database
-Base.metadata.create_all(bind=engine)
+# Database initialization (Using a temporary sync engine for schema creation)
+from sqlalchemy import create_engine
+sync_url = settings.DATABASE_URL
+sync_engine = create_engine(sync_url)
+Base.metadata.create_all(bind=sync_engine)
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 limiter = Limiter(key_func=get_remote_address)
+from contextlib import asynccontextmanager
+from app.services.monitor import monitor
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    print("--- HunterOS Resilience Engine: Starting ---")
+    monitor.start()
+    yield
+    # Shutdown logic
+    print("--- HunterOS Resilience Engine: Shutting Down ---")
+    await monitor.stop()
+
 app = FastAPI(
     title="HunterOS API",
     description="Autonomous Career Execution Engine",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -48,6 +65,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Global Resilience Handler ────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import logging
+    from app.api.routes.websocket import emit_agent_update
+    
+    logger = logging.getLogger("app.main")
+    logger.error(f"UNHANDLED_EXCEPTION: {str(exc)}", exc_info=True)
+    
+    # Alert Mission Control
+    try:
+        await emit_agent_update(
+            agent="System", 
+            status="error", 
+            message=f"Critical Internal Error: {str(exc)[:100]}..."
+        )
+    except Exception:
+        pass
+        
+    return HTTPException(status_code=500, detail="Internal Server Error").__dict__
 
 
 # Add Session Middleware for OAuth
@@ -116,6 +154,9 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboar
 app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 app.include_router(interview.router, prefix="/api/v1/interview", tags=["Interview Simulation"])
 app.include_router(extension.router, prefix="/api/v1/extension", tags=["Browser Extension"])
+
+# Instrumentation
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/")
 @limiter.limit("10/minute")

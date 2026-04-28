@@ -20,4 +20,5 @@ class Profile(Base):
     # New Intelligent Pipeline Fields
     resume_variants = Column(JSON, default=dict) # e.g., {"Standard": [...], "AI Engineer": [...]}
     skill_graph = Column(JSON, default=dict) # e.g., {"clusters": [...], "strength": 85}
+    preference_weights = Column(JSON, default=lambda: {"skills": 1.0, "experience": 1.0, "education": 1.0, "location": 1.0})
 

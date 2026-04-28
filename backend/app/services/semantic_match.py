@@ -7,14 +7,14 @@ def cosine_similarity(a, b):
     """
     if not a or not b:
         return 0
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9)
 
-def semantic_score(resume_text: str, job_desc: str):
+async def semantic_score(resume_text: str, job_desc: str):
     """
-    Calculates a semantic similarity score between resume and job description using embeddings.
+    Calculates a semantic similarity score using async embeddings.
     """
-    emb_resume = llm_client.get_embedding(resume_text)
-    emb_job = llm_client.get_embedding(job_desc)
+    emb_resume = await llm_client.get_embedding(resume_text)
+    emb_job = await llm_client.get_embedding(job_desc)
     
     if not emb_resume or not emb_job:
         return 0
@@ -22,8 +22,6 @@ def semantic_score(resume_text: str, job_desc: str):
     similarity = cosine_similarity(emb_resume, emb_job)
     
     # Scale similarity to 0-100
-    # Embedding similarities are usually between 0.6 and 0.9 for relevant text
-    # We can normalize it slightly
     score = int(max(0, (similarity - 0.5) / 0.5) * 100) if similarity > 0.5 else int(similarity * 100)
     
     return min(100, score)

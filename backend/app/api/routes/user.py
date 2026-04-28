@@ -9,7 +9,8 @@ from app.auth.dependencies import get_current_user
 router = APIRouter()
 
 @router.get("/me")
-def read_user_me(current_user: User = Depends(get_current_user)):
+async def read_user_me(current_user: User = Depends(get_current_user)):
+    """Returns the current authenticated user (Async)."""
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -18,9 +19,9 @@ def read_user_me(current_user: User = Depends(get_current_user)):
     }
 
 @router.get("/identity")
-def get_user_identity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_user_identity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Fetch the core user identity linked to the logged-in user.
+    Fetch the core user identity linked to the logged-in user (Async).
     """
     identity = db.query(UserIdentity).filter(UserIdentity.user_id == current_user.id).first()
     if not identity:
@@ -40,9 +41,9 @@ def get_user_identity(current_user: User = Depends(get_current_user), db: Sessio
     }
 
 @router.post("/identity")
-def update_user_identity(data: Dict[str, Any], current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def update_user_identity(data: Dict[str, Any], current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Update the core user identity.
+    Update the core user identity (Async).
     """
     identity = db.query(UserIdentity).filter(UserIdentity.user_id == current_user.id).first()
     if not identity:

@@ -4,9 +4,9 @@ from app.agents.pipeline import pipeline
 from app.agents.state import AgentState
 import uuid
 
-def run_application_pipeline(profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+async def run_application_pipeline(profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Entry point for the Multi-Agent Orchestration.
+    Entry point for the Multi-Agent Orchestration (Async).
     Initializes state and runs it through the graph.
     """
     # Create a unique session ID for this pipeline run
@@ -21,9 +21,10 @@ def run_application_pipeline(profile: Dict[str, Any], job: Dict[str, Any]) -> Di
     })
     
     # Initialize the engine
+    # pipeline is now List[List[BaseAgent]]
     orchestrator = Orchestrator(pipeline)
     
-    # Run the graph
-    final_state = orchestrator.run(state)
+    # Run the graph (Await)
+    final_state = await orchestrator.run(state)
     
     return dict(final_state) # Return as normal dict

@@ -1,4 +1,5 @@
 import numpy as np
+import asyncio
 from typing import List
 
 class EmbeddingService:
@@ -11,14 +12,17 @@ class EmbeddingService:
             print("SentenceTransformers not found. Using mock embeddings.")
             self.use_mock = True
 
-    def get_embedding(self, text: str) -> np.ndarray:
+    async def get_embedding(self, text: str) -> np.ndarray:
         if self.use_mock or not text:
             return np.random.rand(384)
-        return self.model.encode(text)
+        
+        # Offload CPU intensive task to a thread to avoid blocking the event loop
+        return await asyncio.to_thread(self.model.encode, text)
 
-    def get_embeddings(self, texts: List[str]) -> np.ndarray:
+    async def get_embeddings(self, texts: List[str]) -> np.ndarray:
         if self.use_mock:
             return np.random.rand(len(texts), 384)
-        return self.model.encode(texts)
+        
+        return await asyncio.to_thread(self.model.encode, texts)
 
 embedding_service = EmbeddingService()

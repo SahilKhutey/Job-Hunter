@@ -2,7 +2,7 @@ import os
 import json
 from app.utils.stealth import get_random_ua
 
-def load_session(browser, user_id):
+async def load_session(browser, user_id):
     session_dir = "sessions"
     if not os.path.exists(session_dir):
         os.makedirs(session_dir)
@@ -16,7 +16,8 @@ def load_session(browser, user_id):
     try:
         storage_state = path if os.path.exists(path) else None
         
-        return browser.new_context(
+        # In async playwright, new_context is async
+        return await browser.new_context(
             user_agent=user_agent,
             viewport=viewport,
             storage_state=storage_state,
@@ -26,12 +27,13 @@ def load_session(browser, user_id):
         )
     except Exception as e:
         print(f"Error loading session: {e}")
-        return browser.new_context(user_agent=user_agent, viewport=viewport)
+        return await browser.new_context(user_agent=user_agent, viewport=viewport)
 
-def save_session(context, user_id):
-    """Persists cookies and storage state for future runs."""
+async def save_session(context, user_id):
+    """Persists cookies and storage state for future runs (Async)."""
     session_dir = "sessions"
     os.makedirs(session_dir, exist_ok=True)
     path = f"{session_dir}/{user_id}.json"
-    context.storage_state(path=path)
+    # storage_state is async
+    await context.storage_state(path=path)
     return path

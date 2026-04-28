@@ -47,8 +47,7 @@ class ExecutionAgent(BaseAgent):
             viewport={'width': 1440, 'height': 900},
             user_agent=ua,
             color_scheme="dark",
-            locale="en-US",
-            storage_state=self.session_path if os.path.exists(self.session_path) else None
+            locale="en-US"
         )
         
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
